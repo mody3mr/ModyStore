@@ -1,0 +1,1266 @@
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-app.js";
+import { getDatabase, ref, onValue, get, push, update } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-database.js";
+
+const firebaseConfig = {
+    apiKey: "AIzaSyBzXZ-olKlD76cCw5dtp8IU1qZMSKSTi1g",
+    authDomain: "modytech-850c2.firebaseapp.com",
+    projectId: "modytech-850c2",
+    storageBucket: "modytech-850c2.firebasestorage.app",
+    messagingSenderId: "909293461306",
+    appId: "1:909293461306:web:48e5492107ad32ceec7a03"
+};
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+// For GitHub Pages, set storeSettings.orderApiBaseUrl from the dashboard to
+// the deployed backend. Same-origin deployments may leave it empty.
+// Current public tunnel used by the deployed storefront. Override it from
+// dashboard > Settings > Orders API Base URL when the tunnel changes.
+const STORE_API_BASE_URL = "";
+
+function apiUrl(path) {
+    let configured = String(storeSettings.orderApiBaseUrl || STORE_API_BASE_URL || '').trim();
+    // Ignore an old localhost value when the storefront is hosted publicly.
+    if (!/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?(?:\/api)?$/i.test(configured) || /^(localhost|127\.0\.0\.1)$/i.test(window.location.hostname)) {
+        // keep configured value
+    } else {
+        configured = STORE_API_BASE_URL;
+    }
+    const base = configured.replace(/\/$/, "");
+    const requestPath = path.startsWith("/") ? path : `/${path}`;
+    // Accept both `https://host` and `https://host/api` in the dashboard.
+    if (/\/api$/i.test(base) && /^\/api\//i.test(requestPath)) {
+        return `${base}${requestPath.slice(4)}`;
+    }
+    return `${base}${requestPath}`;
+}
+
+// Keep storefront pricing aligned with the dashboard's timed offers.
+const isOfferActive = (product) => {
+    const discount = Number(product?.discountPrice || 0);
+    const endAt = Number(product?.offerEndAt || 0);
+    return discount > 0 && (!endAt || endAt > Date.now());
+};
+const activeProductPrice = (product) => isOfferActive(product)
+    ? Number(product.discountPrice)
+    : Number(product?.price || 0);
+const makeOrderId = () => { const c='ABCDEFGHJKLMNPQRSTUVWXYZ23456789',b=crypto.getRandomValues(new Uint8Array(12)); return Array.from(b,x=>c[x%32]).join(''); };
+const escapeHtml = (value = '') => String(value ?? '').replace(/[&<>\"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[c]));
+const jsArg = (value = '') => String(value ?? '').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/[\r\n]/g, ' ');
+const offerRemaining = (product) => {
+    const endAt = Number(product?.offerEndAt || 0);
+    if (!endAt) return product?.offerDays ? `${product.offerDays} أيام` : '';
+    const remaining = Math.max(0, endAt - Date.now());
+    const minutes = Math.ceil(remaining / 60000);
+    if (minutes <= 0) return 'انتهى العرض';
+    if (minutes < 60) return `${minutes} دقيقة`;
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    if (hours < 24) return `${hours} ساعة${mins ? ` و${mins} دقيقة` : ''}`;
+    const days = Math.floor(hours / 24);
+    return `${days} يوم${days > 1 ? 'اً' : ''}`;
+};
+
+let allActiveProducts = [];
+let cart = [];
+let appliedVoucher = null; 
+let storeSettings = {}; 
+let currentShippingCost = 0; 
+let currentFilterType = 'الكل';
+
+const defaultHeroSlides = [
+    { title: 'اختيارات مميزة لكل يوم', subtitle: 'اكتشف أحدث المنتجات والعروض من اسم البراند', imageUrl: '', buttonEnabled: true, buttonLabel: 'تسوق الآن', action: 'catalog', target: '', isActive: true },
+    { title: 'عروض تستحق المشاهدة', subtitle: 'تابع التخفيضات المتاحة قبل انتهاء مدتها', imageUrl: '', buttonEnabled: true, buttonLabel: 'شاهد العروض', action: 'offers', target: '', isActive: true }
+];
+let heroSwiperInstance = null;
+
+function getAnalyticsSessionId() {
+    try {
+        let id = sessionStorage.getItem('modyAnalyticsSessionId');
+        if (!id) {
+            id = `s_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+            sessionStorage.setItem('modyAnalyticsSessionId', id);
+        }
+        return id;
+    } catch (_) {
+        return `s_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+    }
+}
+
+const analyticsSessionId = getAnalyticsSessionId();
+async function updateAnalyticsSession(fields) {
+    const configuredBase = String(storeSettings.orderApiBaseUrl || STORE_API_BASE_URL || '').trim();
+    try {
+        if (configuredBase) {
+            const response = await fetch(apiUrl('/api/analytics/session'), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sessionId: analyticsSessionId, fields })
+            });
+            if (response.ok) return;
+        }
+        await update(ref(db, `analytics/sessions/${analyticsSessionId}`), fields);
+    } catch (error) {
+        console.warn('Analytics update skipped:', error);
+    }
+}
+
+async function recordStoreVisit() {
+    const sessionRef = ref(db, `analytics/sessions/${analyticsSessionId}`);
+    try {
+        const snapshot = await get(sessionRef);
+        const now = Date.now();
+        await updateAnalyticsSession({
+            ...(snapshot.exists() ? {} : { firstVisitAt: now }),
+            lastSeenAt: now,
+            path: window.location.pathname
+        });
+    } catch (error) {
+        const now = Date.now();
+        await updateAnalyticsSession({ firstVisitAt: now, lastSeenAt: now, path: window.location.pathname });
+    }
+}
+recordStoreVisit();
+
+function markCartStarted() {
+    try {
+        if (sessionStorage.getItem('modyCartStarted') === '1') return;
+        sessionStorage.setItem('modyCartStarted', '1');
+    } catch (_) {}
+    updateAnalyticsSession({ cartAddedAt: Date.now() });
+}
+
+function markCartCompleted(orderId) {
+    updateAnalyticsSession({ completedAt: Date.now(), orderId: String(orderId || '') });
+}
+
+function initHeroSwiper() {
+    const root = document.querySelector('.heroSwiper');
+    if (!root || root.hidden || typeof Swiper === 'undefined') return;
+    if (heroSwiperInstance) heroSwiperInstance.destroy(true, true);
+    const slideCount = root.querySelectorAll('.swiper-slide').length;
+    if (!slideCount) return;
+    heroSwiperInstance = new Swiper(root, {
+        loop: slideCount > 1,
+        autoplay: slideCount > 1 ? { delay: 4500, disableOnInteraction: false } : false,
+        pagination: { el: '.heroSwiper .swiper-pagination', clickable: true }
+    });
+}
+
+function renderHero(heroConfig) {
+    const root = document.querySelector('.heroSwiper');
+    const container = document.getElementById('heroSlidesContainer');
+    if (!root || !container) return;
+    const enabled = heroConfig?.enabled !== false;
+    root.hidden = !enabled;
+    if (!enabled) {
+        if (heroSwiperInstance) heroSwiperInstance.destroy(true, true);
+        heroSwiperInstance = null;
+        return;
+    }
+    const configuredSlides = heroConfig ? (Array.isArray(heroConfig.slides) ? heroConfig.slides : []) : null;
+    const slides = (configuredSlides === null ? defaultHeroSlides : configuredSlides).filter(slide => slide && slide.isActive !== false);
+    container.innerHTML = slides.map((slide, index) => {
+        const hasImage = Boolean(String(slide.imageUrl || '').trim());
+        const showButton = slide.buttonEnabled !== false && slide.action && slide.action !== 'none';
+        return `<div class="swiper-slide hero-slide ${hasImage ? 'has-image' : 'no-image'}" data-hero-image="${escapeHtml(slide.imageUrl || '')}">
+            <div class="hero-slide-overlay"></div>
+            <div class="hero-content">
+                <span class="hero-eyebrow">MODY STORE</span>
+                <h2>${escapeHtml(slide.title || '')}</h2>
+                <p>${escapeHtml(slide.subtitle || '')}</p>
+                ${showButton ? `<button type="button" class="hero-action" onclick="handleHeroAction('${jsArg(slide.action)}','${jsArg(slide.target || '')}')">${escapeHtml(slide.buttonLabel || 'اعرف المزيد')} <i class="fas fa-arrow-left"></i></button>` : ''}
+            </div>
+        </div>`;
+    }).join('');
+    root.querySelectorAll('[data-hero-image]').forEach(slide => {
+        const imageUrl = slide.dataset.heroImage;
+        if (imageUrl) slide.style.backgroundImage = `url("${imageUrl.replace(/["\\]/g, '\\$&')}")`;
+    });
+    root.hidden = !enabled || slides.length === 0;
+    requestAnimationFrame(initHeroSwiper);
+}
+
+window.handleHeroAction = (action, target) => {
+    if (action === 'product' && target) return window.openProductDetails(target);
+    const categories = document.getElementById('catBar');
+    if (action === 'offers') {
+        const offersButton = document.querySelector('.offers-btn');
+        if (offersButton) window.filterBy('عروض', offersButton);
+    }
+    categories?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+};
+
+async function createFirebaseOrder(payload) {
+    const [productsSnap, shippingSnap] = await Promise.all([
+        get(ref(db, 'products')),
+        get(ref(db, 'shipping'))
+    ]);
+    if (!productsSnap.exists()) throw new Error('المنتجات غير متاحة حاليًا.');
+
+    const products = productsSnap.val() || {};
+    const items = [];
+    const productUpdates = {};
+    let subtotal = 0;
+    for (const requested of payload.items) {
+        const product = products[requested.id];
+        const qty = Math.max(1, Math.floor(Number(requested.qty) || 0));
+        if (!product || product.isActive === false) throw new Error('أحد المنتجات لم يعد متاحًا.');
+        const stock = Number(product.stock) || 0;
+        if (qty > stock) throw new Error(`الكمية المطلوبة من ${product.name || 'المنتج'} أكبر من المخزون المتاح.`);
+        const originalPrice = Number(product.price || 0);
+        const price = activeProductPrice(product);
+        items.push({
+            id: requested.id,
+            name: product.name || 'منتج',
+            price,
+            originalPrice,
+            offerDiscount: Math.max(0, originalPrice - price) * qty,
+            qty,
+            imageUrl: product.imageUrl || ''
+        });
+        subtotal += price * qty;
+        productUpdates[`products/${requested.id}/stock`] = stock - qty;
+    }
+
+    let shippingCost = null;
+    if (shippingSnap.exists()) {
+        shippingSnap.forEach(node => {
+            const shipping = node.val() || {};
+            if (shipping.isActive !== false && String(shipping.name || '').trim() === payload.customer.city) {
+                shippingCost = Number(shipping.price) || 0;
+            }
+        });
+    }
+    if (shippingCost === null) throw new Error('المحافظة المختارة غير متاحة حاليًا.');
+
+    let discount = 0;
+    let voucher = null;
+    if (appliedVoucher) {
+        discount = appliedVoucher.type === 'percentage'
+            ? subtotal * ((Number(appliedVoucher.value) || 0) / 100)
+            : Number(appliedVoucher.value) || 0;
+        discount = Math.min(Math.max(discount, 0), subtotal);
+        voucher = { id: appliedVoucher.id || null, code: appliedVoucher.code || '' };
+    }
+
+    let orderId = makeOrderId();
+    while ((await get(ref(db, `orders/${orderId}`))).exists()) orderId = makeOrderId();
+    const order = {
+        orderId,
+        secretCode: orderId,
+        source: 'الموقع الإلكتروني',
+        customer: payload.customer,
+        paymentMethod: payload.paymentMethod,
+        paymentStatus: payload.paymentMethod === 'كاش' ? 'cod_pending' : 'manual_pending',
+        items,
+        subtotal,
+        shippingCost,
+        discount,
+        offerDiscount: items.reduce((sum, item) => sum + Number(item.offerDiscount || 0), 0),
+        total: Math.max(0, subtotal + shippingCost - discount),
+        status: 'قيد المراجعة',
+        voucher,
+        stockDeducted: true,
+        createdAt: Date.now()
+    };
+
+    // Realtime Database multi-location updates are atomic: either the order
+    // and all stock changes succeed together, or none of them are applied.
+    await update(ref(db), { ...productUpdates, [`orders/${orderId}`]: order });
+    return {
+        ok: true,
+        orderId,
+        paymentRequired: false,
+        subtotal: order.subtotal,
+        shippingCost: order.shippingCost,
+        discount: order.discount,
+        total: order.total
+    };
+}
+
+const Toast = Swal.mixin({
+    toast: true,
+    position: 'top-end',
+    showConfirmButton: false,
+    timer: 3000,
+    timerProgressBar: true
+});
+
+// ==== الدارك مود ====
+const savedTheme = localStorage.getItem('theme') || 'light';
+document.documentElement.setAttribute('data-theme', savedTheme);
+updateThemeIcon(savedTheme);
+
+window.toggleTheme = () => {
+    const currentTheme = document.documentElement.getAttribute('data-theme');
+    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', newTheme);
+    localStorage.setItem('theme', newTheme);
+    updateThemeIcon(newTheme);
+};
+
+function updateThemeIcon(theme) {
+    const icon = document.getElementById('themeIcon');
+    if(icon) {
+        icon.className = theme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
+    }
+}
+
+// ==== جلب الإعدادات الخاصة بالمتجر ====
+onValue(ref(db, 'storeSettings'), (snapshot) => {
+    if (snapshot.exists()) {
+        storeSettings = snapshot.val();
+        recordStoreVisit();
+
+        const closed = storeSettings.closedStore || {};
+        const closedBanner = document.getElementById('storeClosedBanner');
+        if (closedBanner) closedBanner.hidden = storeSettings.isOpen !== false;
+        const closedTitle = document.getElementById('storeClosedTitle');
+        const closedMessage = document.getElementById('storeClosedMessage');
+        if (closedTitle) closedTitle.textContent = closed.title || 'نأخذ استراحة قصيرة ونعود قريباً';
+        if (closedMessage) closedMessage.textContent = closed.message || 'يمكنك تصفح المنتجات الآن، وسنفتح استقبال الطلبات قريباً.';
+        const shippingPolicy = document.getElementById('shippingPolicyText');
+        const returnPolicy = document.getElementById('returnPolicyText');
+        const shippingItem = document.getElementById('shippingPolicyItem');
+        const returnItem = document.getElementById('returnPolicyItem');
+        const shippingEnabled = storeSettings.policies?.shippingEnabled === true && String(storeSettings.policies?.shipping || '').trim();
+        const returnEnabled = storeSettings.policies?.returnsEnabled === true && String(storeSettings.policies?.returns || '').trim();
+        if (shippingPolicy) shippingPolicy.textContent = shippingEnabled || '';
+        if (returnPolicy) returnPolicy.textContent = returnEnabled || '';
+        if (shippingItem) shippingItem.style.display = shippingEnabled ? '' : 'none';
+        if (returnItem) returnItem.style.display = returnEnabled ? '' : 'none';
+        renderHero(storeSettings.hero || null);
+        
+        // الشريط الإخباري
+        const ticker = document.getElementById("newsTicker");
+        if (ticker) {
+            if (storeSettings.newsTicker) {
+                ticker.innerHTML = `<div class="scrolling-text"><i class="fas fa-bullhorn"></i> ${escapeHtml(storeSettings.newsTicker)}</div>`;
+                ticker.style.display = "block";
+            } else {
+                ticker.style.display = "none";
+            }
+        }
+
+        // طرق الدفع
+        const pmSelect = document.getElementById("paymentMethod");
+        if (pmSelect) {
+            pmSelect.innerHTML = "";
+            // Older stores may not have paymentMethods yet; keep cash as the
+            // backwards-compatible default until the admin configures them.
+            const configured = storeSettings.paymentMethods;
+            const methods = configured && typeof configured === 'object'
+                ? configured
+                : { cod: true, wallet: false, instapay: false };
+            const manual = storeSettings.manualPayment && typeof storeSettings.manualPayment === 'object'
+                ? storeSettings.manualPayment
+                : {};
+            if (methods.cod !== false) pmSelect.innerHTML += '<option value="كاش">💵 الدفع عند الاستلام</option>';
+            if (methods.wallet === true && Array.isArray(manual.walletNumbers) && manual.walletNumbers.some(Boolean)) pmSelect.innerHTML += '<option value="محفظة الكترونية">📱 محفظة الكترونية</option>';
+            if (methods.instapay === true && String(manual.instapayDetails || '').trim()) pmSelect.innerHTML += '<option value="انستا باي">🔵 انستا باي</option>';
+            if (!pmSelect.options.length) pmSelect.innerHTML = '<option value="" disabled selected>لا توجد طريقة دفع متاحة حالياً</option>';
+        }
+
+        // بيانات الفوتر
+        if (storeSettings.email) {
+            document.getElementById("footerEmail").innerHTML = `<i class="far fa-envelope"></i> <span class="info-text" dir="ltr">${escapeHtml(storeSettings.email)}</span>`;
+            document.getElementById("footerEmail").style.display = "flex";
+        }
+        if (storeSettings.phone) {
+            document.getElementById("footerPhone").innerHTML = `<i class="fas fa-mobile-alt"></i> <span class="info-text" dir="ltr">${escapeHtml(storeSettings.phone)}</span>`;
+            document.getElementById("footerPhone").style.display = "flex";
+        }
+        if (storeSettings.address) {
+            document.getElementById("footerAddress").innerHTML = `<i class="fas fa-map-marker-alt"></i> <span class="info-text">${escapeHtml(storeSettings.address)}</span>`;
+            document.getElementById("footerAddress").style.display = "flex";
+        }
+
+        // السوشيال ميديا
+        if (storeSettings.social && storeSettings.socialEnabled) {
+            const fb = document.getElementById("socFb"), ig = document.getElementById("socInsta"), tg = document.getElementById("socTg"), wa = document.getElementById("socWa"), tiktok = document.getElementById("socTiktok");
+            
+            if(storeSettings.socialEnabled.facebook && storeSettings.social.facebook) { fb.href = storeSettings.social.facebook; fb.style.display = "flex"; } else { fb.style.display = "none"; }
+            if(storeSettings.socialEnabled.instagram && storeSettings.social.instagram) { ig.href = storeSettings.social.instagram; ig.style.display = "flex"; } else { ig.style.display = "none"; }
+            if(storeSettings.socialEnabled.telegram && storeSettings.social.telegram) { tg.href = storeSettings.social.telegram; tg.style.display = "flex"; } else { tg.style.display = "none"; }
+            if(storeSettings.socialEnabled.whatsapp && storeSettings.social.whatsapp) { wa.href = `https://wa.me/${storeSettings.social.whatsapp.replace(/\D/g,'')}`; wa.style.display = "flex"; } else { wa.style.display = "none"; }
+            if(storeSettings.socialEnabled.tiktok && storeSettings.social.tiktok) { tiktok.href = storeSettings.social.tiktok; tiktok.style.display = "flex"; } else { tiktok.style.display = "none"; }
+        }
+    }
+});
+
+let reviewsSwiperInstance = null;
+
+// ==== جلب صور العملاء ====
+onValue(ref(db, 'storeReviews'), (snapshot) => {
+    const container = document.getElementById("reviewsContainer");
+    const emptyMessage = document.getElementById("reviewsEmptyMessage");
+    if(!container) return;
+    container.innerHTML = "";
+    const photos = [];
+    
+    if (snapshot.exists()) {
+        snapshot.forEach(child => {
+            const r = child.val();
+            if (r.isActive !== false && r.imageUrl) photos.push(r);
+        });
+    }
+
+    photos.sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
+    container.innerHTML = photos.map(r => `
+        <div class="swiper-slide customer-photo-card">
+            <img src="${escapeHtml(r.imageUrl)}" alt="صورة من أحد عملاء اسم البراند" loading="lazy">
+        </div>
+    `).join('');
+    if (emptyMessage) emptyMessage.style.display = photos.length ? 'none' : 'flex';
+    document.querySelector('.reviewsSwiper')?.classList.toggle('is-empty', !photos.length);
+    requestAnimationFrame(() => {
+        if (reviewsSwiperInstance) { reviewsSwiperInstance.update(); reviewsSwiperInstance.slideTo(0, 0); }
+    });
+});
+
+// ==== تهيئة السلايدر (Swiper) ====
+document.addEventListener("DOMContentLoaded", () => {
+    renderHero(storeSettings.hero || null);
+
+    reviewsSwiperInstance = new Swiper('.reviewsSwiper', {
+        slidesPerView: 1.25,
+        spaceBetween: 12,
+        grabCursor: true,
+        speed: 650,
+        rewind: true,
+        observer: true,
+        observeParents: true,
+        watchOverflow: false,
+        navigation: { nextEl: '.reviews-next', prevEl: '.reviews-prev' },
+        breakpoints: {
+            640: { slidesPerView: 2.3, spaceBetween: 16 },
+            1024: { slidesPerView: 4.2, spaceBetween: 18 },
+        },
+        autoplay: { delay: 3200, disableOnInteraction: false, pauseOnMouseEnter: true }
+    });
+});
+
+handlePaymentReturn();
+
+// تفعيل شريط التنقل السفلي
+window.setActiveNav = (element) => {
+    document.querySelectorAll('.bottom-nav .nav-item').forEach(nav => nav.classList.remove('active'));
+    element.classList.add('active');
+};
+
+// ==== أسعار الشحن ====
+onValue(ref(db, 'shipping'), (snapshot) => {
+    const citySelect = document.getElementById("custCity");
+    if (citySelect) {
+        citySelect.innerHTML = '<option value="">اختر المحافظة / المدينة...</option>';
+        if (snapshot.exists()) {
+            snapshot.forEach(child => {
+                const s = child.val();
+                if (s.isActive !== false) {
+                    citySelect.innerHTML += `<option value="${escapeHtml(s.name)}" data-price="${Number(s.price) || 0}">${escapeHtml(s.name)} (شحن: ${Number(s.price) || 0} ج.م)</option>`;
+                }
+            });
+        }
+    }
+});
+
+window.updateShippingCost = () => {
+    const citySelect = document.getElementById("custCity");
+    if (citySelect && citySelect.value) {
+        const selectedOption = citySelect.options[citySelect.selectedIndex];
+        currentShippingCost = Number(selectedOption.getAttribute('data-price')) || 0;
+    } else {
+        currentShippingCost = 0;
+    }
+    updateCartUI();
+};
+
+onValue(ref(db, 'categories'), (snapshot) => {
+    const catBar = document.getElementById("catBar");
+    catBar.innerHTML = `
+        <button class="cat-btn active" onclick="filterBy('الكل', this)">الكل</button>
+        <button class="cat-btn offers-btn" onclick="filterBy('عروض', this)"><i class="fas fa-fire"></i> عروض حصرية</button>
+    `;
+    if(snapshot.exists()){
+        snapshot.forEach(child => {
+            const c = child.val();
+            if(c.isActive !== false) {
+                catBar.innerHTML += `<button class="cat-btn" onclick="filterBy('${jsArg(c.name)}', this)">${escapeHtml(c.name)}</button>`;
+            }
+        });
+    }
+});
+
+onValue(ref(db, 'products'), (snapshot) => {
+    allActiveProducts = [];
+    if (snapshot.exists()) {
+        snapshot.forEach(child => {
+            const p = child.val();
+            if (p.isActive !== false) {
+                p.id = child.key;
+                p.effectivePrice = activeProductPrice(p);
+                allActiveProducts.push(p);
+            }
+        });
+    }
+    if (cart.length) updateCartUI();
+    renderProducts(currentFilterType);
+});
+
+window.renderProducts = (filterType) => {
+    const grid = document.getElementById("productsGrid");
+    grid.innerHTML = "";
+    let filtered = [];
+
+    if (filterType === "الكل") filtered = allActiveProducts;
+    else if (filterType === "عروض") filtered = allActiveProducts.filter(isOfferActive);
+    else filtered = allActiveProducts.filter(p => p.category === filterType);
+
+    if (filtered.length === 0) {
+        grid.innerHTML = `
+            <div style="grid-column: 1/-1; text-align:center; padding:60px 20px;">
+                <i class="fas fa-box-open" style="font-size: 60px; color: var(--gray); margin-bottom: 20px;"></i>
+                <h3 style="color: var(--text-light); font-weight: 800;">لا توجد منتجات في هذا القسم حالياً</h3>
+            </div>`;
+        return;
+    }
+
+    filtered.forEach((p, index) => {
+        const offerActive = isOfferActive(p);
+        const effectivePrice = activeProductPrice(p);
+        p.effectivePrice = effectivePrice;
+        let priceHtml = `<span class="product-price">${effectivePrice} <span>ج.م</span></span>`;
+        let badgeHtml = "";
+        let countdownHtml = "";
+        
+        if (offerActive) {
+            priceHtml = `<span class="product-price"><span class="old-price" style="font-size:14px;">${Number(p.price || 0)}</span> ${effectivePrice} <span>ج.م</span></span>`;
+            badgeHtml = `<div class="discount-badge">خصم ${Math.max(0, Number(p.price || 0) - effectivePrice)} ج.م</div>`;
+            
+            const remaining = offerRemaining(p);
+            if (remaining) {
+                countdownHtml = `<div class="offer-countdown"><i class="fas fa-stopwatch"></i> ينتهي العرض خلال: <span>${escapeHtml(remaining)}</span></div>`;
+            }
+        }
+        
+        let btnHtml = '';
+        if (Number(p.stock || 0) <= 0) {
+            badgeHtml += `<div class="discount-badge" style="background:var(--accent); color:white; left:15px; right:auto;">نفذت الكمية</div>`;
+            btnHtml = `<button class="add-to-cart out-of-stock" disabled onclick="event.stopPropagation();">نفذ المخزون <i class="fas fa-ban"></i></button>`;
+        } else {
+            btnHtml = `<button class="add-to-cart" onclick="event.stopPropagation(); addToCart('${jsArg(p.id)}', '${jsArg(p.name)}', ${effectivePrice}, '${jsArg(p.imageUrl || '')}', ${Number(p.stock || 0)})">إضافة للسلة <i class="fas fa-cart-plus"></i></button>`;
+        }
+
+        grid.innerHTML += `
+            <div class="product-card" data-product-id="${escapeHtml(p.id)}" style="animation-delay: ${index * 0.05}s" onclick="openProductDetails('${jsArg(p.id)}')">
+                ${badgeHtml}
+                <div class="product-img-wrapper">
+                    <img src="${escapeHtml(p.imageUrl || 'https://via.placeholder.com/300x300?text=صورة+المنتج')}" class="product-img" onerror="this.src='https://via.placeholder.com/300x300?text=صورة+المنتج'">
+                </div>
+                <div class="product-details">
+                    <div class="product-cat">${escapeHtml(p.category || '')}</div>
+                    <h3 class="product-title">${escapeHtml(p.name || '')}</h3>
+                    ${countdownHtml}
+                    <div class="price-wrapper">${priceHtml}</div>
+                    ${btnHtml}
+                </div>
+            </div>
+        `;
+    });
+};
+
+window.filterBy = (catName, btn) => {
+    currentFilterType = catName;
+    document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    renderProducts(catName);
+};
+
+window.openProductDetails = (id) => {
+    const p = allActiveProducts.find(prod => prod.id === id);
+    if(!p) return;
+
+    document.getElementById('modalProductImg').src = p.imageUrl || 'https://via.placeholder.com/600x600?text=صورة+المنتج';
+    document.getElementById('modalProductCat').innerText = p.category;
+    document.getElementById('modalProductTitle').innerText = p.name;
+    document.getElementById('modalProductDesc').innerText = p.description || 'لا توجد تفاصيل إضافية مسجلة لهذا المنتج.';
+    const offerActive = isOfferActive(p);
+    const effectivePrice = activeProductPrice(p);
+    p.effectivePrice = effectivePrice;
+    let priceHtml = `<span class="product-price" style="font-size: 30px;">${effectivePrice} <span>ج.م</span></span>`;
+    let timerHtml = '';
+
+    if (offerActive) {
+        priceHtml = `
+            <span class="product-price" style="font-size: 30px;">${effectivePrice} <span>ج.م</span></span>
+            <span class="old-price" style="font-size: 20px; color: #94a3b8; margin-right: 15px;">${Number(p.price || 0)} ج.م</span>
+            <span style="background: var(--accent); color: white; padding: 4px 10px; border-radius: 6px; font-weight: bold; font-size: 13px; margin-right: 15px;">توفير ${Math.max(0, Number(p.price || 0) - effectivePrice)} ج.م</span>
+        `;
+        const remaining = offerRemaining(p);
+        if (remaining) {
+            timerHtml = `<div class="offer-countdown" style="margin-bottom:15px; font-size:14px;"><i class="fas fa-stopwatch"></i> ينتهي العرض خلال: <span>${escapeHtml(remaining)}</span></div>`;
+        }
+    }
+    document.getElementById('modalProductPriceWrapper').innerHTML = priceHtml;
+    
+    const timerDiv = document.getElementById('modalOfferTimer');
+    if(timerHtml) { timerDiv.innerHTML = timerHtml; timerDiv.style.display = 'block'; }
+    else { timerDiv.style.display = 'none'; }
+
+    const btnContainer = document.getElementById('modalBtnContainer');
+    if (Number(p.stock || 0) <= 0) {
+        btnContainer.innerHTML = `<button class="modal-add-btn out-of-stock" disabled>نفذ المخزون <i class="fas fa-ban"></i></button>`;
+    } else {
+        btnContainer.innerHTML = `<button class="modal-add-btn" id="modalAddBtn">إضافة للسلة <i class="fas fa-cart-plus"></i></button>`;
+        document.getElementById('modalAddBtn').onclick = () => {
+            addToCart(p.id, p.name, effectivePrice, p.imageUrl, Number(p.stock || 0));
+            closeProductModal();
+        };
+    }
+
+    document.getElementById('productDetailsModal').style.display = 'flex';
+};
+
+// Re-render when a timed offer crosses its expiry boundary.
+setInterval(() => {
+    if (allActiveProducts.some(p => p.offerEndAt && Number(p.offerEndAt) <= Date.now())) {
+        renderProducts(currentFilterType);
+    }
+}, 60000);
+
+window.closeProductModal = () => {
+    document.getElementById('productDetailsModal').style.display = 'none';
+};
+
+window.closeOverlay = () => {
+    document.getElementById("cartSidebar").classList.remove("open");
+    const checkout = document.getElementById("checkoutModal");
+    if (checkout) checkout.style.display = "none";
+    const tracking = document.getElementById("trackingModal");
+    if (tracking) tracking.style.display = "none";
+    document.getElementById("overlay").classList.remove("show");
+};
+
+window.toggleCart = () => {
+    const sidebar = document.getElementById("cartSidebar");
+    const overlay = document.getElementById("overlay");
+    sidebar.classList.toggle("open");
+    if (sidebar.classList.contains("open")) {
+        overlay.classList.add("show");
+    } else {
+        overlay.classList.remove("show");
+    }
+};
+
+window.addToCart = (id, name, price, img, stock) => {
+    if (storeSettings.isOpen === false) {
+        return Swal.fire({icon: 'info', title: storeSettings.closedStore?.title || 'نأخذ استراحة قصيرة', text: storeSettings.closedStore?.message || 'يمكنك تصفح المنتجات الآن، وسنفتح استقبال الطلبات قريباً.', confirmButtonColor: 'var(--title-color)'});
+    }
+
+    const product = allActiveProducts.find(item => item.id === id);
+    const currentPrice = product ? activeProductPrice(product) : Number(price || 0);
+    const currentStock = product ? Number(product.stock || 0) : Number(stock || 0);
+    const existingItem = cart.find(item => item.id === id);
+    const currentQty = existingItem ? existingItem.qty : 0;
+    
+    if ((currentQty + 1) > currentStock) {
+        return Toast.fire({icon: 'warning', title: `عفواً، الكمية المتاحة في المخزون هي ${currentStock} فقط`});
+    }
+
+    if (existingItem) {
+        existingItem.qty++;
+        existingItem.price = currentPrice;
+        existingItem.stock = currentStock;
+    } else {
+        cart.push({ id, name, price: currentPrice, img, stock: currentStock, qty: 1 });
+    }
+    
+    Toast.fire({icon: 'success', title: 'تمت الإضافة للسلة'});
+    markCartStarted();
+    updateCartUI();
+    document.getElementById("cartSidebar").classList.add("open");
+    document.getElementById("overlay").classList.add("show");
+};
+
+window.updateQty = (id, change) => {
+    const item = cart.find(item => item.id === id);
+    if(item) {
+        if(change > 0 && (item.qty + change) > item.stock) {
+            return Toast.fire({icon: 'warning', title: `أقصى كمية متاحة هي ${item.stock}`});
+        }
+        item.qty += change;
+        if(item.qty <= 0) cart = cart.filter(i => i.id !== id);
+        updateCartUI();
+    }
+};
+
+window.removeFromCart = (id) => {
+    cart = cart.filter(item => item.id !== id);
+    updateCartUI();
+};
+
+function updateCartUI() {
+    const container = document.getElementById("cartItemsContainer");
+    container.innerHTML = "";
+    let subtotal = 0; let count = 0;
+
+    if(cart.length === 0) {
+        container.innerHTML = `
+            <div style='text-align:center; padding:60px 20px; color:var(--text-light);'>
+                <i class="fas fa-shopping-basket" style="font-size: 60px; margin-bottom:20px; color: var(--gray);"></i>
+                <p style="font-weight: 800; font-size:18px; color: var(--title-color);">سلة مشترياتك فارغة</p>
+                <p style="font-size:14px; margin-top:5px;">أضف بعض المنتجات للبدء</p>
+            </div>`;
+    } else {
+        cart.forEach(item => {
+            const product = allActiveProducts.find(p => p.id === item.id);
+            if (product) {
+                item.price = activeProductPrice(product);
+                item.stock = Number(product.stock || item.stock || 0);
+            }
+            subtotal += (item.price * item.qty);
+            count += item.qty;
+            container.innerHTML += `
+                <div class="cart-item">
+                    <i class="fas fa-times remove-item" onclick="removeFromCart('${jsArg(item.id)}')"></i>
+                    <img src="${escapeHtml(item.img || 'https://via.placeholder.com/100')}" onerror="this.src='https://via.placeholder.com/100'">
+                    <div class="cart-item-details">
+                        <div class="cart-item-title">${escapeHtml(item.name || '')}</div>
+                        <div class="cart-item-price">${Number(item.price || 0)} ج.م</div>
+                        <div class="qty-controls">
+                            <button class="qty-btn" onclick="updateQty('${jsArg(item.id)}', 1)"><i class="fas fa-plus" style="font-size:10px;"></i></button>
+                            <span class="qty-num">${Number(item.qty || 0)}</span>
+                            <button class="qty-btn" onclick="updateQty('${jsArg(item.id)}', -1)"><i class="fas fa-minus" style="font-size:10px;"></i></button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+    }
+    
+    document.getElementById("cartCountBadge").innerText = count;
+    if(document.getElementById("bottomCartBadge")) {
+        document.getElementById("bottomCartBadge").innerText = count;
+    }
+    document.getElementById("subtotalPrice").innerText = subtotal + " ج.م";
+    
+    if (document.getElementById("shippingCostValue")) {
+        document.getElementById("shippingCostValue").innerText = `+${currentShippingCost} ج.م`;
+    }
+    calculateFinalTotal(subtotal);
+}
+
+window.applyPromo = () => {
+    const codeInput = document.getElementById("promoInput").value.trim().toUpperCase();
+    const msgBox = document.getElementById("promoMessage");
+    if(!codeInput) return;
+
+    get(ref(db, 'vouchers')).then((snapshot) => {
+        let foundVoucher = null;
+        if(snapshot.exists()){
+            snapshot.forEach(child => {
+                const v = child.val();
+                if(v.code === codeInput && v.isActive) {
+                    foundVoucher = v;
+                    foundVoucher.id = child.key; 
+                }
+            });
+        }
+        if(foundVoucher) {
+            appliedVoucher = foundVoucher;
+            msgBox.style.color = "var(--success)";
+            msgBox.innerHTML = `<i class="fas fa-check-circle"></i> تم تطبيق الخصم بنجاح!`;
+            Toast.fire({icon: 'success', title: 'تم تفعيل الكوبون'});
+        } else {
+            appliedVoucher = null;
+            msgBox.style.color = "var(--accent)";
+            msgBox.innerHTML = `<i class="fas fa-exclamation-circle"></i> الكود غير صحيح أو منتهي.`;
+            Toast.fire({icon: 'error', title: 'كوبون غير صالح'});
+        }
+        updateCartUI();
+    });
+};
+
+function calculateFinalTotal(subtotal) {
+    let discount = 0;
+    const discountRow = document.getElementById("discountRow");
+
+    if (appliedVoucher && subtotal > 0) {
+        if (appliedVoucher.type === "percentage") discount = subtotal * (appliedVoucher.value / 100);
+        else discount = appliedVoucher.value;
+        if(discount > subtotal) discount = subtotal;
+
+        document.getElementById("discountValue").innerText = `-${Math.round(discount)} ج.م`;
+        discountRow.style.display = "flex";
+    } else {
+        discountRow.style.display = "none";
+    }
+    
+    document.getElementById("finalTotalPrice").innerText = Math.round(subtotal - discount + currentShippingCost) + " ج.م";
+}
+
+window.openCheckoutModal = () => {
+    if(cart.length === 0) {
+        Swal.fire({icon: 'warning', title: 'عفواً', text: 'سلة المشتريات فارغة!', confirmButtonColor: 'var(--title-color)'});
+        return;
+    }
+    if (storeSettings.isOpen === false) {
+        return Swal.fire({icon: 'info', title: storeSettings.closedStore?.title || 'نأخذ استراحة قصيرة', text: storeSettings.closedStore?.message || 'يمكنك تصفح المنتجات الآن، وسنفتح استقبال الطلبات قريباً.', confirmButtonColor: 'var(--title-color)'});
+    }
+    document.getElementById("checkoutModal").style.display = "block";
+    document.getElementById("cartSidebar").classList.remove("open");
+};
+
+function getCurrentOrderSummary() {
+    const subtotal = cart.reduce((sum, item) => sum + (Number(item.price || 0) * Number(item.qty || 0)), 0);
+    let discount = 0;
+    if (appliedVoucher && subtotal > 0) {
+        discount = appliedVoucher.type === 'percentage'
+            ? subtotal * (Number(appliedVoucher.value || 0) / 100)
+            : Number(appliedVoucher.value || 0);
+        discount = Math.min(Math.max(discount, 0), subtotal);
+    }
+    return {
+        subtotal,
+        shippingCost: Number(currentShippingCost || 0),
+        discount,
+        total: Math.max(0, subtotal + Number(currentShippingCost || 0) - discount)
+    };
+}
+
+// ==== إرسال الطلب ومعالجة بوابات الدفع ====
+window.sendOrder = async () => {
+    const name = document.getElementById("custName").value.trim();
+    const phone = document.getElementById("custPhone").value.trim();
+    const phone2 = document.getElementById("custPhone2").value.trim();
+    const city = document.getElementById("custCity").value;
+    const region = document.getElementById("custRegion").value.trim();
+    const building = document.getElementById("custBuilding").value.trim();
+    const floor = document.getElementById("custFloor").value.trim();
+    const apartment = document.getElementById("custAppt").value.trim();
+    const landmark = document.getElementById("custLandmark").value.trim();
+    const address = document.getElementById("custAddress").value.trim();
+    const paymentMethod = document.getElementById("paymentMethod").value;
+    const btn = document.getElementById("submitOrderBtn");
+
+    if (!name || !phone || !city || !region || !address) {
+        Swal.fire({icon: 'error', title: 'بيانات ناقصة', text: 'الرجاء إكمال البيانات الأساسية للتوصيل (الاسم، الموبايل، المحافظة، المنطقة، العنوان)', confirmButtonColor: 'var(--title-color)'});
+        return;
+    }
+
+    if (!paymentMethod) {
+        Swal.fire({icon: 'error', title: 'طريقة الدفع', text: 'الرجاء اختيار طريقة الدفع أولاً.', confirmButtonColor: 'var(--title-color)'});
+        return;
+    }
+
+    if (!cart.length) {
+        Swal.fire({icon: 'warning', title: 'السلة فارغة', text: 'أضف منتجات قبل إرسال الطلب.', confirmButtonColor: 'var(--title-color)'});
+        return;
+    }
+
+    btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> جاري تأكيد الطلب...`;
+    btn.disabled = true;
+
+    const clientSummary = getCurrentOrderSummary();
+    const payload = {
+        customer: { name, phone, phone2, city, region, building, floor, apartment, landmark, address },
+        paymentMethod,
+        items: cart.map(item => ({ id: item.id, qty: item.qty })),
+        voucherCode: appliedVoucher ? appliedVoucher.code : null
+    };
+
+    try {
+        const endpoint = apiUrl('/api/orders');
+        const isGithubPages = true;
+    // الدفع اليدوي لا يحتاج بوابة دفع خارجية.
+        const requiresBackend = false;
+        let result;
+        if (isGithubPages && endpoint === '/api/orders') {
+            if (requiresBackend) {
+                throw new Error('الدفع الإلكتروني يحتاج رابط Backend منشور. اضبط Orders API Base URL من الداشبورد أو اختر طريقة دفع أخرى.');
+            }
+            result = await createFirebaseOrder(payload);
+        } else {
+            try {
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                result = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    if (!requiresBackend && [404, 405, 501].includes(response.status)) {
+                        result = await createFirebaseOrder(payload);
+                    } else if (response.status === 404) {
+                        throw new Error('خادم الدفع غير متصل أو المسار غير صحيح. راجع Orders API Base URL من الداشبورد.');
+                    } else {
+                        throw new Error(result.message || 'تعذر إنشاء الطلب.');
+                    }
+                } else if (!result?.orderId) {
+                    if (!requiresBackend) result = await createFirebaseOrder(payload);
+                    else throw new Error('خادم الدفع لم يُرجع رقم طلب صالحًا. راجع Orders API Base URL من الداشبورد.');
+                }
+            } catch (backendError) {
+                if (!requiresBackend && backendError?.name === 'TypeError') {
+                    result = await createFirebaseOrder(payload);
+                } else {
+                    throw backendError;
+                }
+            }
+        }
+
+        if (false && result.paymentRequired && result.checkoutUrl) {
+            sessionStorage.setItem('pendingPaymobOrderId', result.orderId);
+            sessionStorage.setItem('pendingPaymobOrder', JSON.stringify({
+                orderId: result.orderId,
+                customer: payload.customer,
+                items: cart.map(item => ({ id:item.id, name:item.name, qty:item.qty, price:item.price })),
+                summary: {
+                    subtotal: Number(result.subtotal ?? clientSummary.subtotal),
+                    shippingCost: Number(result.shippingCost ?? clientSummary.shippingCost),
+                    discount: Number(result.discount ?? clientSummary.discount),
+                    total: Number(result.total ?? clientSummary.total)
+                }
+            }));
+            Swal.fire({
+                icon: 'info',
+                title: 'جاري فتح الدفع الآمن',
+                html: `سيتم تحويلك الآن إلى صفحة الدفع الآمنة من Paymob.<br><small>رقم الطلب: <b>${result.orderId}</b></small>`,
+                confirmButtonText: 'الدفع الآن',
+                allowOutsideClick: false
+            }).then(() => {
+                window.location.href = result.checkoutUrl;
+            });
+            return;
+        }
+
+        const completedOrder = {
+            orderId: result.orderId,
+            subtotal: Number(result.subtotal ?? clientSummary.subtotal),
+            shippingCost: Number(result.shippingCost ?? clientSummary.shippingCost),
+            discount: Number(result.discount ?? clientSummary.discount),
+            total: Number(result.total ?? clientSummary.total)
+        };
+        completeOrderSuccess({ ...completedOrder, paymentMethod });
+        Swal.fire({
+            icon: 'success',
+            title: 'تم استلام الطلب',
+            text: paymentMethod === 'كاش'
+                ? 'تم تسجيل طلبك بنجاح وسيتم تحصيل المبلغ عند الاستلام.'
+                : 'تم تسجيل طلبك بنجاح. أرسل إثبات الدفع عبر تيليجرام أو واتساب ليتم مراجعته يدوياً.',
+            confirmButtonColor: 'var(--secondary)'
+        });
+    } catch (error) {
+        console.error('Order submission error:', error);
+        const message = error?.name === 'TypeError'
+            ? 'تعذر الاتصال بخادم الطلبات. تأكد من تشغيل الـ Backend وضبط Orders API Base URL من الداشبورد.'
+            : (error.message || 'حدث خطأ غير متوقع، يرجى المحاولة مرة أخرى.');
+        Swal.fire({icon: 'error', title: 'تعذر إرسال الطلب', text: message, confirmButtonColor: 'var(--title-color)'});
+    } finally {
+        btn.innerHTML = `تأكيد وإرسال الطلب <i class="fas fa-check-circle"></i>`;
+        btn.disabled = false;
+    }
+};
+
+async function handlePaymentReturn() {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('payment_return') !== '1') return;
+
+    const orderId = params.get('orderId') || sessionStorage.getItem('pendingPaymobOrderId');
+    const pendingOrder = JSON.parse(sessionStorage.getItem('pendingPaymobOrder') || 'null');
+    if (!orderId) return;
+
+    const cleanUrl = `${window.location.origin}${window.location.pathname}`;
+    window.history.replaceState({}, document.title, cleanUrl);
+
+    const checkoutForm = document.getElementById('checkoutForm');
+    const successScreen = document.getElementById('successScreen');
+    if (checkoutForm) checkoutForm.style.display = 'none';
+    if (successScreen) successScreen.style.display = 'block';
+    const successTitle = successScreen ? successScreen.querySelector('h3') : null;
+    const successText = successScreen ? successScreen.querySelector('p') : null;
+    const successId = document.getElementById('successOrderId');
+    if (successId) successId.innerText = orderId;
+    populateSuccessSummary({ orderId, ...(pendingOrder?.summary || {}) });
+    if (successTitle) successTitle.innerText = 'جاري تأكيد الدفع...';
+    if (successText) successText.innerHTML = 'تم الرجوع من Paymob. نتحقق الآن من حالة الدفع بشكل آمن.';
+
+    try {
+        const response = await fetch(apiUrl(`/api/orders/status/${encodeURIComponent(orderId)}`), { cache: 'no-store' });
+        const data = await response.json();
+        if (data.paymentStatus === 'paid') {
+            if (successTitle) successTitle.innerText = 'تم الدفع واستلام الطلب بنجاح!';
+            const summary = {
+                subtotal: Number(data.subtotal ?? pendingOrder?.summary?.subtotal ?? data.total ?? 0),
+                shippingCost: Number(data.shippingCost ?? pendingOrder?.summary?.shippingCost ?? 0),
+                discount: Number(data.discount ?? pendingOrder?.summary?.discount ?? 0),
+                total: Number(data.total ?? pendingOrder?.summary?.total ?? 0)
+            };
+            populateSuccessSummary({ orderId, ...summary });
+            if (successText) successText.innerText = 'الرجاء الاحتفاظ بالرقم السري لمتابعة حالة طلبك.';
+            if (pendingOrder?.customer) {
+                // تم إلغاء التأكيد التلقائي عبر WhatsApp ضمن تدفق الدفع اليدوي.
+            }
+            sessionStorage.removeItem('pendingPaymobOrderId');
+            sessionStorage.removeItem('pendingPaymobOrder');
+            markCartCompleted(orderId);
+            cart = [];
+            appliedVoucher = null;
+            updateCartUI();
+        } else if (data.paymentStatus === 'failed') {
+            if (successTitle) { successTitle.innerText = 'لم يتم الدفع'; successTitle.style.color = 'var(--accent)'; }
+            if (successText) successText.innerHTML = `لم تكتمل عملية الدفع للطلب <strong>${orderId}</strong>. يمكنك المحاولة مرة أخرى.`;
+        } else {
+            if (successText) successText.innerHTML = `عملية الدفع ما زالت قيد التأكيد للطلب <strong>${orderId}</strong>. يمكنك الانتظار قليلاً ثم تحديث الصفحة.`;
+        }
+    } catch (error) {
+        console.error('Payment status check failed:', error);
+        if (successText) successText.innerHTML = `تم استلام الرجوع من Paymob، لكن تعذر قراءة الحالة حالياً. رقم الطلب: <strong>${orderId}</strong>`;
+    }
+}
+
+function populateSuccessSummary(order) {
+    document.getElementById("successOrderId").innerText = order.orderId || '';
+    document.getElementById("successSubtotal").innerText = `${Math.round(Number(order.subtotal || 0))} ج.م`;
+    document.getElementById("successShipping").innerText = `${Math.round(Number(order.shippingCost || 0))} ج.م`;
+    document.getElementById("successDiscount").innerText = `-${Math.round(Number(order.discount || 0))} ج.م`;
+    document.getElementById("successTotal").innerText = `${Math.round(Number(order.total || 0))} ج.م`;
+}
+
+function renderManualPaymentNextSteps(paymentMethod, orderId) {
+    const successScreen = document.getElementById('successScreen');
+    if (!successScreen) return;
+    let box = document.getElementById('manualPaymentNextSteps');
+    if (!box) {
+        box = document.createElement('div');
+        box.id = 'manualPaymentNextSteps';
+        box.style.cssText = 'margin:16px 0;padding:16px;border:1px solid #dbeafe;border-radius:14px;background:#f8fbff;text-align:right;line-height:1.8;';
+        successScreen.appendChild(box);
+    }
+    const manual = storeSettings.manualPayment && typeof storeSettings.manualPayment === 'object' ? storeSettings.manualPayment : {};
+    if (paymentMethod === 'كاش') {
+        box.innerHTML = '<strong>طريقة الدفع:</strong> الدفع عند الاستلام';
+        box.style.display = 'block';
+        return;
+    }
+    const walletNumbers = Array.isArray(manual.walletNumbers) ? manual.walletNumbers.filter(Boolean) : [];
+    let html = '<strong>طريقة الدفع:</strong> ' + escapeHtml(paymentMethod) + '<br>';
+    if (paymentMethod === 'محفظة الكترونية' && walletNumbers.length) html += '<div><strong>أرقام المحفظة:</strong><br>' + walletNumbers.map(n => '<span dir="ltr">' + escapeHtml(n) + '</span>').join('<br>') + '</div>';
+    if (paymentMethod === 'انستا باي' && manual.instapayDetails) html += '<div><strong>بيانات إنستا باي:</strong><br>' + escapeHtml(manual.instapayDetails).replace(/\n/g, '<br>') + '</div>';
+    const telegram = String(manual.telegramUrl || '').trim();
+    const whatsapp = String(manual.whatsappNumber || '').replace(/\D/g, '');
+    const links = [];
+    if (telegram) links.push('<a href="' + escapeHtml(telegram) + '" target="_blank" rel="noopener" style="color:#1683d8;font-weight:700;">فتح تيليجرام وإرسال إثبات الدفع</a>');
+    if (whatsapp) links.push('<a href="https://wa.me/' + whatsapp + '?text=' + encodeURIComponent('إثبات دفع الطلب ' + orderId) + '" target="_blank" rel="noopener" style="color:#16a34a;font-weight:700;">التواصل عبر واتساب</a>');
+    html += links.length ? '<div style="margin-top:8px;">' + links.join(' أو ') + '</div>' : '<div>سيتم التواصل معك يدوياً لتزويدك بتفاصيل الدفع.</div>';
+    html += '<div style="color:#64748b;font-size:13px;margin-top:6px;">رقم الطلب: ' + escapeHtml(orderId || '') + '</div>';
+    box.innerHTML = html;
+    box.style.display = 'block';
+}
+
+function completeOrderSuccess(order) {
+    const btn = document.getElementById("submitOrderBtn");
+    btn.innerHTML = `تأكيد وإرسال الطلب <i class="fas fa-check-circle"></i>`;
+    btn.disabled = false;
+    
+    document.getElementById("checkoutForm").style.display = "none";
+    document.getElementById("successScreen").style.display = "block";
+    populateSuccessSummary(order);
+    renderManualPaymentNextSteps(order.paymentMethod || 'كاش', order.orderId);
+    markCartCompleted(order.orderId);
+    
+    cart = [];
+    appliedVoucher = null;
+    updateCartUI();
+}
+
+// ==== التتبع والأوامر الأخرى ====
+window.openTrackingModal = () => {
+    document.getElementById('trackingModal').style.display = 'block';
+    document.getElementById('overlay').classList.add('show');
+    document.getElementById('trackingResult').style.display = 'none';
+    document.getElementById('trackOrderId').value = '';
+    document.getElementById('trackPhone').value = '';
+};
+
+window.trackOrder = () => {
+    const orderIdInput = document.getElementById('trackOrderId').value.trim();
+    const phoneInput = document.getElementById('trackPhone').value.trim();
+    const resultBox = document.getElementById('trackingResult');
+    const statusText = document.getElementById('trackingStatusText');
+    const detailsBox = document.getElementById('trackingOrderDetails');
+
+    if(!orderIdInput || !phoneInput) {
+        Toast.fire({icon: 'warning', title: 'الرجاء إدخال بيانات التتبع بالكامل'});
+        return;
+    }
+
+    const safeId = orderIdInput.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    get(ref(db, 'orders/' + (safeId || '_'))).then((snapshot) => {
+        let foundOrder = null;
+        let foundDbId = null;
+        if (snapshot.exists()) {
+            const order = snapshot.val();
+            if (String(order.customer?.phone || '').trim() === phoneInput) { foundOrder = order; foundDbId = snapshot.key; }
+        }
+
+        resultBox.style.display = "block";
+
+        if(foundOrder) {
+            let statusColor = "var(--secondary)";
+            if(foundOrder.status === "تم تسليمه") statusColor = "var(--success)";
+            if(foundOrder.status === "ملغي" || foundOrder.status === "مرتجع") statusColor = "var(--accent)";
+            
+            statusText.style.color = statusColor;
+            statusText.innerText = foundOrder.status;
+
+            let itemsHtml = '<ul style="list-style:none; margin: 15px 0; padding:0; border-top:1px solid var(--border); padding-top:10px;">';
+            foundOrder.items.forEach(item => {
+                itemsHtml += `<li style="display:flex; justify-content:space-between; margin-bottom:8px; border-bottom:1px dashed var(--border); padding-bottom:8px;">
+                    <span style="font-weight:bold;">${item.qty}x ${item.name}</span>
+                    <span style="color:var(--secondary); font-weight:bold;">${item.price * item.qty} ج.م</span>
+                </li>`;
+            });
+            itemsHtml += '</ul>';
+
+            const orderDate = new Date(foundOrder.createdAt).toLocaleDateString('ar-EG');
+            let discountHtml = foundOrder.discount > 0 ? `<div style="color:var(--accent); display:flex; justify-content:space-between; margin-bottom:5px;"><span>الخصم:</span> <span>-${Math.round(foundOrder.discount)} ج.م</span></div>` : "";
+            let shippingHtml = `<div style="display:flex; justify-content:space-between; margin-bottom:5px; color:var(--text-light);"><span>الشحن:</span> <span>${foundOrder.shippingCost || 0} ج.م</span></div>`;
+            const confirmation = foundOrder.customerConfirmation?.status;
+            const confirmationHtml = confirmation === 'confirmed'
+                ? '<div style="color:var(--success);font-weight:800;margin:8px 0;"><i class="fas fa-circle-check"></i> تم تأكيد الطلب من العميل</div>'
+                : confirmation === 'cancelled'
+                    ? '<div style="color:var(--accent);font-weight:800;margin:8px 0;"><i class="fas fa-circle-xmark"></i> تم إلغاء الطلب بواسطة العميل</div>'
+                    : '';
+
+            let actionsHtml = '';
+            if (foundOrder.status === 'قيد المراجعة') {
+                actionsHtml = `
+                    <div style="display: flex; gap: 10px; margin-top: 20px; padding-top: 15px; border-top: 2px dashed var(--border);">
+                        <button onclick="editCustomerOrder('${foundDbId}')" style="flex:1; background:var(--secondary); color:white; border:none; padding:12px; border-radius:8px; cursor:pointer; font-family:'Cairo'; font-weight:bold; font-size:15px; transition:0.3s;">تعديل الطلب <i class="fas fa-edit"></i></button>
+                        <button onclick="cancelCustomerOrder('${foundDbId}')" style="flex:1; background:var(--accent); color:white; border:none; padding:12px; border-radius:8px; cursor:pointer; font-family:'Cairo'; font-weight:bold; font-size:15px; transition:0.3s;">إلغاء الطلب <i class="fas fa-times"></i></button>
+                    </div>
+                `;
+            }
+
+            detailsBox.innerHTML = `
+                <div style="margin-bottom: 5px; color: var(--text-light); text-align: right;"><strong>تاريخ الطلب:</strong> ${orderDate}</div>
+                <div style="margin-bottom: 5px; color: var(--text-light); text-align: right;"><strong>طريقة الدفع:</strong> ${foundOrder.paymentMethod || 'كاش'}</div>
+                ${confirmationHtml}
+                ${itemsHtml}
+                <div style="display:flex; justify-content:space-between; margin-bottom:5px; color:var(--text-light);"><span>الإجمالي الفرعي:</span> <span>${foundOrder.subtotal} ج.م</span></div>
+                ${shippingHtml}
+                ${discountHtml}
+                <div style="display:flex; justify-content:space-between; margin-top:15px; font-size:18px; font-weight:900; color:var(--title-color); background:var(--gray); padding:10px; border-radius:8px;">
+                    <span>الإجمالي النهائي:</span> <span>${Math.round(foundOrder.total)} ج.م</span>
+                </div>
+                ${actionsHtml}
+            `;
+        } else {
+            statusText.style.color = "var(--accent)";
+            statusText.innerText = "لم يتم العثور على طلب بهذه البيانات.";
+            detailsBox.innerHTML = "";
+        }
+    });
+};
+
+async function requestOrderCancellation(dbId, phone, reason) {
+    const snap = await get(ref(db, `orders/${dbId}`));
+    if (!snap.exists() || String(snap.val().customer?.phone || '') !== String(phone)) throw new Error('تعذر إلغاء الطلب.');
+    if (snap.val().status !== 'قيد المراجعة') throw new Error('لا يمكن إلغاء الطلب بعد بدء مراجعته. تواصل معنا.');
+    await update(ref(db, `orders/${dbId}`), { status: 'ملغي', cancelReason: String(reason || '').slice(0, 200), cancelledAt: Date.now() });
+    return { ok: true };
+}
+
+window.cancelCustomerOrder = (dbId) => {
+    Swal.fire({
+        title: 'إلغاء الطلب؟',
+        text: "هل أنت متأكد من إلغاء هذا الطلب بشكل نهائي؟",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: 'var(--accent)',
+        cancelButtonColor: 'var(--text-light)',
+        confirmButtonText: 'نعم، إلغاء الطلب',
+        cancelButtonText: 'تراجع'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            const trackedPhone = document.getElementById('trackPhone').value.trim();
+            requestOrderCancellation(dbId, trackedPhone, 'تم الإلغاء بواسطة العميل').then(() => {
+                Swal.fire({icon: 'success', title: 'تم', text: 'تم إلغاء الطلب بنجاح.', confirmButtonColor: 'var(--title-color)'});
+                document.getElementById('trackingModal').style.display = 'none';
+                document.getElementById('overlay').classList.remove('show');
+            }).catch(error => {
+                Swal.fire({icon: 'error', title: 'تعذر الإلغاء', text: error.message, confirmButtonColor: 'var(--title-color)'});
+            });
+        }
+    });
+};
+
+window.editCustomerOrder = (dbId) => {
+    Swal.fire({
+        title: 'تعديل الطلب؟',
+        text: "سيتم إلغاء هذا الطلب وإرجاع المنتجات لسلة التسوق لتتمكن من إضافة أو إزالة منتجات. هل توافق؟",
+        icon: 'info',
+        showCancelButton: true,
+        confirmButtonColor: 'var(--secondary)',
+        cancelButtonColor: 'var(--text-light)',
+        confirmButtonText: 'نعم، موافق',
+        cancelButtonText: 'تراجع'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            get(ref(db, `orders/${dbId}`)).then(snapshot => {
+                if(snapshot.exists()) {
+                    const orderData = snapshot.val();
+                    
+                    cart = []; 
+                    orderData.items.forEach(item => {
+                        const fullProd = allActiveProducts.find(p => p.id === item.id) || {};
+                        cart.push({
+                            id: item.id,
+                            name: item.name,
+                            price: item.price,
+                            qty: item.qty,
+                            stock: fullProd.stock || 0,
+                            img: fullProd.imageUrl || 'https://via.placeholder.com/100'
+                        });
+                    });
+                    
+                    if(orderData.customer) {
+                        document.getElementById("custName").value = orderData.customer.name || '';
+                        document.getElementById("custPhone").value = orderData.customer.phone || '';
+                        document.getElementById("custPhone2").value = orderData.customer.phone2 || '';
+                        document.getElementById("custRegion").value = orderData.customer.region || '';
+                        document.getElementById("custBuilding").value = orderData.customer.building || '';
+                        document.getElementById("custFloor").value = orderData.customer.floor || '';
+                        document.getElementById("custAppt").value = orderData.customer.apartment || '';
+                        document.getElementById("custLandmark").value = orderData.customer.landmark || '';
+                        document.getElementById("custAddress").value = orderData.customer.address || '';
+                        const citySelect = document.getElementById("custCity");
+                        if(citySelect && orderData.customer.city) {
+                            citySelect.value = orderData.customer.city;
+                            updateShippingCost();
+                        }
+                    }
+                    
+                    requestOrderCancellation(dbId, orderData.customer?.phone || '', 'تم الإلغاء بواسطة العميل بغرض التعديل').then(() => {
+                        updateCartUI();
+                        document.getElementById('trackingModal').style.display = 'none';
+                        document.getElementById('cartSidebar').classList.add('open');
+                        Toast.fire({icon: 'success', title: 'تم تجهيز السلة للتعديل'});
+                    }).catch(error => {
+                        Swal.fire({icon: 'error', title: 'تعذر تجهيز الطلب للتعديل', text: error.message, confirmButtonColor: 'var(--title-color)'});
+                    });
+                }
+            });
+        }
+    });
+};
+
+const cArr = [169, 32, 50, 48, 50, 54, 32, 1578, 1605, 32, 1575, 1604, 1573, 1606, 1588, 1575, 1569, 32, 1576, 1608, 1575, 1587, 1591, 1577, 32, 124, 32, 1605, 1581, 1605, 1583, 32, 1593, 1605, 1585, 1608, 32, 1575, 1576, 1585, 1575, 1607, 1610, 1605, 32, 124, 32, 1605, 1608, 1583, 1610, 32, 1587, 1578, 1608, 1585];
+const lArr = [104, 116, 116, 112, 115, 58, 47, 47, 119, 97, 46, 109, 101, 47, 43, 50, 48, 49, 48, 57, 52, 50, 54, 52, 50, 48, 54];
+const devCopy = document.getElementById("devCopyLink");
+if(devCopy) {
+    devCopy.innerText = String.fromCharCode(...cArr);
+    devCopy.href = String.fromCharCode(...lArr);
+}

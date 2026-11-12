@@ -1,0 +1,83 @@
+{
+ "rules": {
+  ".read": false,
+  ".write": false,
+  "products": {
+   ".read": true,
+   ".write": "auth != null && root.child('employees').child(auth.uid).exists() && root.child('employees').child(auth.uid).child('isActive').val() !== false",
+   "$pid": {
+    "stock": {
+     ".write": "auth != null && root.child('employees').child(auth.uid).exists() && root.child('employees').child(auth.uid).child('isActive').val() !== false || (newData.isNumber() && data.isNumber() && newData.val() >= 0 && newData.val() < data.val())"
+    }
+   }
+  },
+  "categories": {
+   ".read": true,
+   ".write": "auth != null && root.child('employees').child(auth.uid).exists() && root.child('employees').child(auth.uid).child('isActive').val() !== false"
+  },
+  "shipping": {
+   ".read": true,
+   ".write": "auth != null && root.child('employees').child(auth.uid).exists() && root.child('employees').child(auth.uid).child('isActive').val() !== false"
+  },
+  "vouchers": {
+   ".read": true,
+   ".write": "auth != null && root.child('employees').child(auth.uid).exists() && root.child('employees').child(auth.uid).child('isActive').val() !== false"
+  },
+  "storeReviews": {
+   ".read": true,
+   ".write": "auth != null && root.child('employees').child(auth.uid).exists() && root.child('employees').child(auth.uid).child('isActive').val() !== false"
+  },
+  "storeSettings": {
+   ".read": true,
+   ".write": "auth != null && root.child('employees').child(auth.uid).child('role').val() === 'Admin'"
+  },
+  "orders": {
+   ".read": "auth != null && root.child('employees').child(auth.uid).exists() && root.child('employees').child(auth.uid).child('isActive').val() !== false",
+   "$id": {
+    ".read": true,
+    ".write": "auth != null && root.child('employees').child(auth.uid).exists() && root.child('employees').child(auth.uid).child('isActive').val() !== false || (!data.exists() && newData.child('status').val() === 'قيد المراجعة') || (data.exists() && data.child('status').val() === 'قيد المراجعة' && newData.child('status').val() === 'ملغي' && newData.child('total').val() === data.child('total').val() && newData.child('customer/phone').val() === data.child('customer/phone').val())",
+    ".validate": "auth != null && root.child('employees').child(auth.uid).exists() && root.child('employees').child(auth.uid).child('isActive').val() !== false || ($id.matches(/^[A-Z2-9]{12}$/) && newData.hasChildren(['orderId','customer','items','total','status','createdAt']) && newData.child('orderId').val() === $id && (newData.child('status').val() === 'قيد المراجعة' || newData.child('status').val() === 'ملغي') && newData.child('total').isNumber() && newData.child('total').val() >= 0 && newData.child('total').val() < 1000000 && newData.child('customer/name').isString() && newData.child('customer/name').val().length <= 100 && newData.child('customer/phone').val().matches(/^\\+?[0-9]{10,14}$/) && newData.child('customer/address').val().length <= 400)"
+   }
+  },
+  "analytics": {
+   ".read": "auth != null && root.child('employees').child(auth.uid).exists() && root.child('employees').child(auth.uid).child('isActive').val() !== false",
+   "sessions": {
+    "$sid": {
+     ".write": "$sid.length >= 8 && $sid.length <= 64",
+     ".validate": "newData.hasChildren() || !newData.exists()"
+    }
+   }
+  },
+  "employees": {
+   ".read": "auth != null && root.child('employees').child(auth.uid).exists() && root.child('employees').child(auth.uid).child('isActive').val() !== false",
+   "$uid": {
+    ".read": "auth != null && auth.uid === $uid",
+    ".write": "auth != null && root.child('employees').child(auth.uid).child('role').val() === 'Admin'"
+   }
+  },
+  "logs": {
+   ".read": "auth != null && root.child('employees').child(auth.uid).exists() && root.child('employees').child(auth.uid).child('isActive').val() !== false",
+   ".write": "auth != null && root.child('employees').child(auth.uid).exists() && root.child('employees').child(auth.uid).child('isActive').val() !== false"
+  },
+  "finance": {
+   ".read": "auth != null && root.child('employees').child(auth.uid).exists() && root.child('employees').child(auth.uid).child('isActive').val() !== false",
+   ".write": "auth != null && root.child('employees').child(auth.uid).exists() && root.child('employees').child(auth.uid).child('isActive').val() !== false"
+  },
+  "inventoryMovements": {
+   ".read": "auth != null && root.child('employees').child(auth.uid).exists() && root.child('employees').child(auth.uid).child('isActive').val() !== false",
+   ".write": "auth != null && root.child('employees').child(auth.uid).exists() && root.child('employees').child(auth.uid).child('isActive').val() !== false"
+  },
+  "shippingCompanies": {
+   ".read": "auth != null && root.child('employees').child(auth.uid).exists() && root.child('employees').child(auth.uid).child('isActive').val() !== false",
+   ".write": "auth != null && root.child('employees').child(auth.uid).exists() && root.child('employees').child(auth.uid).child('isActive').val() !== false"
+  },
+  "shippingShipments": {
+   ".read": "auth != null && root.child('employees').child(auth.uid).exists() && root.child('employees').child(auth.uid).child('isActive').val() !== false",
+   ".write": "auth != null && root.child('employees').child(auth.uid).exists() && root.child('employees').child(auth.uid).child('isActive').val() !== false"
+  },
+  "dashboardNotifications": {
+   ".read": "auth != null && root.child('employees').child(auth.uid).exists() && root.child('employees').child(auth.uid).child('isActive').val() !== false",
+   ".write": "auth != null && root.child('employees').child(auth.uid).exists() && root.child('employees').child(auth.uid).child('isActive').val() !== false"
+  }
+ }
+}
