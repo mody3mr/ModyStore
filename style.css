@@ -269,3 +269,4 @@ select.checkout-input { padding-right: 45px; cursor: pointer; appearance: none;}
 .opt-gallery{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}.opt-thumb{width:58px;height:58px;object-fit:cover;border-radius:8px;border:1px solid var(--border);cursor:pointer}
 
 .logo{display:inline-flex!important;align-items:center;gap:10px;line-height:1.1}.logo img{border-radius:10px}.logo span{display:flex;flex-direction:column}.logo small{font-size:.62rem;letter-spacing:.28em;font-weight:700;opacity:.65;direction:ltr;text-align:start}
+.opt-chip:disabled{opacity:.35;text-decoration:line-through;cursor:not-allowed}
