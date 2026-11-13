@@ -69,7 +69,7 @@ let currentShippingCost = 0;
 let currentFilterType = 'الكل';
 
 const defaultHeroSlides = [
-    { title: 'اختيارات مميزة لكل يوم', subtitle: 'اكتشف أحدث المنتجات والعروض من اسم البراند', imageUrl: '', buttonEnabled: true, buttonLabel: 'تسوق الآن', action: 'catalog', target: '', isActive: true },
+    { title: 'اختيارات مميزة لكل يوم', subtitle: 'اكتشف أحدث المنتجات والعروض من مودي ستور', imageUrl: '', buttonEnabled: true, buttonLabel: 'تسوق الآن', action: 'catalog', target: '', isActive: true },
     { title: 'عروض تستحق المشاهدة', subtitle: 'تابع التخفيضات المتاحة قبل انتهاء مدتها', imageUrl: '', buttonEnabled: true, buttonLabel: 'شاهد العروض', action: 'offers', target: '', isActive: true }
 ];
 let heroSwiperInstance = null;
@@ -202,17 +202,24 @@ async function createFirebaseOrder(payload) {
     const items = [];
     const productUpdates = {};
     let subtotal = 0;
+    const usedQty = {}, usedV = {};
     for (const requested of payload.items) {
         const product = products[requested.id];
         const qty = Math.max(1, Math.floor(Number(requested.qty) || 0));
         if (!product || product.isActive === false) throw new Error('أحد المنتجات لم يعد متاحًا.');
         const stock = Number(product.stock) || 0;
-        if (qty > stock) throw new Error(`الكمية المطلوبة من ${product.name || 'المنتج'} أكبر من المخزون المتاح.`);
+        const sz = String(requested.size || '').slice(0, 20), cl = String(requested.color || '').slice(0, 20);
+        const szs = Object.values(product.sizes || {}), cls = Object.values(product.colors || {});
+        if ((szs.length && !szs.includes(sz)) || (cls.length && !cls.includes(cl))) throw new Error('اختر المقاس واللون من جديد.');
+        usedQty[requested.id] = (usedQty[requested.id] || 0) + qty;
+        if (usedQty[requested.id] > stock) throw new Error(`الكمية المطلوبة من ${product.name || 'المنتج'} أكبر من المخزون المتاح.`);
         const originalPrice = Number(product.price || 0);
         const price = activeProductPrice(product);
         items.push({
             id: requested.id,
-            name: product.name || 'منتج',
+            name: (product.name || 'منتج') + (sz ? ' - ' + sz : '') + (cl ? ' - ' + cl : ''),
+            size: sz,
+            color: cl,
             price,
             originalPrice,
             offerDiscount: Math.max(0, originalPrice - price) * qty,
@@ -220,7 +227,14 @@ async function createFirebaseOrder(payload) {
             imageUrl: product.imageUrl || ''
         });
         subtotal += price * qty;
-        productUpdates[`products/${requested.id}/stock`] = stock - qty;
+        productUpdates[`products/${requested.id}/stock`] = stock - usedQty[requested.id];
+        if (product.variantStock) {
+            const vk = String(sz).replace(/[.#$\[\]\/]/g, '_') + '~' + String(cl).replace(/[.#$\[\]\/]/g, '_');
+            const vstk = Number(product.variantStock[vk] || 0);
+            usedV[requested.id + vk] = (usedV[requested.id + vk] || 0) + qty;
+            if (usedV[requested.id + vk] > vstk) throw new Error('هذا المقاس أو اللون غير متوفر بالكمية المطلوبة.');
+            productUpdates[`products/${requested.id}/variantStock/${vk}`] = vstk - usedV[requested.id + vk];
+        }
     }
 
     let shippingCost = null;
@@ -409,7 +423,7 @@ onValue(ref(db, 'storeReviews'), (snapshot) => {
     photos.sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
     container.innerHTML = photos.map(r => `
         <div class="swiper-slide customer-photo-card">
-            <img src="${escapeHtml(r.imageUrl)}" alt="صورة من أحد عملاء اسم البراند" loading="lazy">
+            <img src="${escapeHtml(r.imageUrl)}" alt="صورة من أحد عملاء مودي ستور" loading="lazy">
         </div>
     `).join('');
     if (emptyMessage) emptyMessage.style.display = photos.length ? 'none' : 'flex';
@@ -608,13 +622,33 @@ window.openProductDetails = (id) => {
     if(timerHtml) { timerDiv.innerHTML = timerHtml; timerDiv.style.display = 'block'; }
     else { timerDiv.style.display = 'none'; }
 
+    const sizes = Object.values(p.sizes || {}), colors = Object.values(p.colors || {});
+    let selSize = '', selColor = '';
     const btnContainer = document.getElementById('modalBtnContainer');
+    let vd = document.getElementById('modalVariants');
+    if (!vd) { vd = document.createElement('div'); vd.id = 'modalVariants'; btnContainer.parentNode.insertBefore(vd, btnContainer); }
+    const VS = p.variantStock || null;
+    const vkey = (s, c) => String(s || '').replace(/[.#$\[\]\/]/g, '_') + '~' + String(c || '').replace(/[.#$\[\]\/]/g, '_');
+    const qtyFor = (s, c) => { if (!VS) return Number(p.stock || 0); let t = 0; (s ? [s] : (sizes.length ? sizes : [''])).forEach(x => (c ? [c] : (colors.length ? colors : [''])).forEach(y => { t += Number(VS[vkey(x, y)] || 0); })); return t; };
+    const drawChips = () => {
+        const chips = (arr, k) => arr.length ? `<div class="opt-row"><b>${k === 's' ? 'المقاس' : 'اللون'}:</b>` + arr.map(v => { const q = k === 's' ? qtyFor(v, selColor) : qtyFor(selSize, v); const on = (k === 's' ? selSize : selColor) === v; return `<button type="button" class="opt-chip${on ? ' on' : ''}" data-k="${k}" data-v="${escapeHtml(v)}" ${q <= 0 ? 'disabled' : ''}>${escapeHtml(v)}</button>`; }).join('') + '</div>' : '';
+        vd.innerHTML = chips(sizes, 's') + chips(colors, 'c');
+    };
+    drawChips();
+    vd.onclick = e => { const b = e.target.closest('.opt-chip'); if (!b || b.disabled) return; if (b.dataset.k === 's') selSize = selSize === b.dataset.v ? '' : b.dataset.v; else selColor = selColor === b.dataset.v ? '' : b.dataset.v; drawChips(); };
+    const mainImg = document.getElementById('modalProductImg');
+    let gd = document.getElementById('modalGallery');
+    if (!gd) { gd = document.createElement('div'); gd.id = 'modalGallery'; gd.className = 'opt-gallery'; mainImg.insertAdjacentElement('afterend', gd); }
+    const imgs = [p.imageUrl, ...Object.values(p.gallery || {})].filter(Boolean);
+    gd.innerHTML = imgs.length > 1 ? imgs.map(u => `<img src="${escapeHtml(u)}" class="opt-thumb" alt="">`).join('') : '';
+    gd.onclick = e => { if (e.target.tagName === 'IMG') mainImg.src = e.target.src; };
     if (Number(p.stock || 0) <= 0) {
         btnContainer.innerHTML = `<button class="modal-add-btn out-of-stock" disabled>نفذ المخزون <i class="fas fa-ban"></i></button>`;
     } else {
         btnContainer.innerHTML = `<button class="modal-add-btn" id="modalAddBtn">إضافة للسلة <i class="fas fa-cart-plus"></i></button>`;
         document.getElementById('modalAddBtn').onclick = () => {
-            addToCart(p.id, p.name, effectivePrice, p.imageUrl, Number(p.stock || 0));
+            if ((sizes.length && !selSize) || (colors.length && !selColor)) return Toast.fire({icon: 'warning', title: 'اختر المقاس واللون أولاً'});
+            addToCart(p.id, p.name, effectivePrice, p.imageUrl, Number(p.stock || 0), selSize, selColor);
             closeProductModal();
         };
     }
@@ -653,16 +687,21 @@ window.toggleCart = () => {
     }
 };
 
-window.addToCart = (id, name, price, img, stock) => {
+window.addToCart = (id, name, price, img, stock, size, color) => {
     if (storeSettings.isOpen === false) {
         return Swal.fire({icon: 'info', title: storeSettings.closedStore?.title || 'نأخذ استراحة قصيرة', text: storeSettings.closedStore?.message || 'يمكنك تصفح المنتجات الآن، وسنفتح استقبال الطلبات قريباً.', confirmButtonColor: 'var(--title-color)'});
     }
 
     const product = allActiveProducts.find(item => item.id === id);
     const currentPrice = product ? activeProductPrice(product) : Number(price || 0);
-    const currentStock = product ? Number(product.stock || 0) : Number(stock || 0);
-    const existingItem = cart.find(item => item.id === id);
-    const currentQty = existingItem ? existingItem.qty : 0;
+    let currentStock = product ? Number(product.stock || 0) : Number(stock || 0);
+    const hasVariants = product && (Object.values(product.sizes || {}).length || Object.values(product.colors || {}).length);
+    if (hasVariants && size === undefined) { openProductDetails(id); return; }
+    const key = [id, size || '', color || ''].join('|');
+    const vsK = product && product.variantStock ? String(size || '').replace(/[.#$\[\]\/]/g, '_') + '~' + String(color || '').replace(/[.#$\[\]\/]/g, '_') : null;
+    if (vsK !== null) currentStock = Number(product.variantStock[vsK] || 0);
+    const existingItem = cart.find(item => item.id === key);
+    const currentQty = vsK !== null ? (existingItem ? existingItem.qty : 0) : cart.filter(item => (item.pid || item.id) === id).reduce((s, i) => s + i.qty, 0);
     
     if ((currentQty + 1) > currentStock) {
         return Toast.fire({icon: 'warning', title: `عفواً، الكمية المتاحة في المخزون هي ${currentStock} فقط`});
@@ -673,7 +712,7 @@ window.addToCart = (id, name, price, img, stock) => {
         existingItem.price = currentPrice;
         existingItem.stock = currentStock;
     } else {
-        cart.push({ id, name, price: currentPrice, img, stock: currentStock, qty: 1 });
+        cart.push({ id: key, pid: id, size: size || '', color: color || '', name: name + (size ? ' - ' + size : '') + (color ? ' - ' + color : ''), price: currentPrice, img, stock: currentStock, qty: 1 });
     }
     
     Toast.fire({icon: 'success', title: 'تمت الإضافة للسلة'});
@@ -756,17 +795,9 @@ window.applyPromo = () => {
     const msgBox = document.getElementById("promoMessage");
     if(!codeInput) return;
 
-    get(ref(db, 'vouchers')).then((snapshot) => {
+    get(ref(db, 'voucherLookup/' + codeInput.replace(/[.#$\[\]\/]/g, ''))).then((snapshot) => {
         let foundVoucher = null;
-        if(snapshot.exists()){
-            snapshot.forEach(child => {
-                const v = child.val();
-                if(v.code === codeInput && v.isActive) {
-                    foundVoucher = v;
-                    foundVoucher.id = child.key; 
-                }
-            });
-        }
+        if (snapshot.exists() && snapshot.val().isActive) { foundVoucher = snapshot.val(); }
         if(foundVoucher) {
             appliedVoucher = foundVoucher;
             msgBox.style.color = "var(--success)";
@@ -866,7 +897,7 @@ window.sendOrder = async () => {
     const payload = {
         customer: { name, phone, phone2, city, region, building, floor, apartment, landmark, address },
         paymentMethod,
-        items: cart.map(item => ({ id: item.id, qty: item.qty })),
+        items: cart.map(item => ({ id: item.pid || item.id, qty: item.qty, size: item.size || '', color: item.color || '' })),
         voucherCode: appliedVoucher ? appliedVoucher.code : null
     };
 
@@ -1118,7 +1149,7 @@ window.trackOrder = () => {
             let itemsHtml = '<ul style="list-style:none; margin: 15px 0; padding:0; border-top:1px solid var(--border); padding-top:10px;">';
             foundOrder.items.forEach(item => {
                 itemsHtml += `<li style="display:flex; justify-content:space-between; margin-bottom:8px; border-bottom:1px dashed var(--border); padding-bottom:8px;">
-                    <span style="font-weight:bold;">${item.qty}x ${item.name}</span>
+                    <span style="font-weight:bold;">${item.qty}x ${escapeHtml(item.name)}</span>
                     <span style="color:var(--secondary); font-weight:bold;">${item.price * item.qty} ج.م</span>
                 </li>`;
             });
