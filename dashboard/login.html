@@ -184,13 +184,13 @@
             font-weight: 600;
         }
     </style>
-</head>
+<link rel="icon" href="../favicon.svg" type="image/svg+xml"><meta name="robots" content="noindex,nofollow"></head>
 <body>
 
     <div class="login-container">
         <div class="login-card animate__animated animate__fadeInUp">
             <div class="brand-logo">
-                <i class="fas fa-shirt"></i> ModyStore
+                <img src="../logo.svg" alt="" width="34" height="34" style="vertical-align:middle;border-radius:9px"> ModyStore
             </div>
             <p class="login-subtitle">لوحة تحكم الإدارة - الرجاء تسجيل الدخول</p>
 
@@ -283,17 +283,12 @@
                 const user = userCredential.user;
 
                 // 2. التحقق من حالة الموظف في الداتا بيز 
-                const snapshot = await get(ref(db, 'employees'));
+                const empSnap = await get(ref(db, `employees/${user.uid}`));
                 let isUserActive = false;
                 let userName = "موظف";
-
-                if (snapshot.exists()) {
-                    snapshot.forEach(child => {
-                        if (child.val().email === user.email && child.val().isActive === true) {
-                            isUserActive = true;
-                            userName = child.val().name;
-                        }
-                    });
+                if (empSnap.exists()) {
+                    const e = empSnap.val();
+                    if (e.isActive !== false && (!e.email || String(e.email).toLowerCase() === String(user.email).toLowerCase())) { isUserActive = true; userName = e.name || userName; }
                 }
 
                 // 3. اتخاذ القرار
