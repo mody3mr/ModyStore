@@ -8,6 +8,11 @@
    "$pid": {
     "stock": {
      ".write": "auth != null && root.child('employees').child(auth.uid).exists() && root.child('employees').child(auth.uid).child('isActive').val() !== false || (newData.isNumber() && data.isNumber() && newData.val() >= 0 && newData.val() < data.val())"
+    },
+    "variantStock": {
+     "$vk": {
+      ".write": "auth != null && root.child('employees').child(auth.uid).exists() && root.child('employees').child(auth.uid).child('isActive').val() !== false || (newData.isNumber() && data.isNumber() && newData.val() >= 0 && newData.val() < data.val())"
+     }
     }
    }
   },
@@ -20,7 +25,7 @@
    ".write": "auth != null && root.child('employees').child(auth.uid).exists() && root.child('employees').child(auth.uid).child('isActive').val() !== false"
   },
   "vouchers": {
-   ".read": true,
+   ".read": "auth != null && root.child('employees').child(auth.uid).exists() && root.child('employees').child(auth.uid).child('isActive').val() !== false",
    ".write": "auth != null && root.child('employees').child(auth.uid).exists() && root.child('employees').child(auth.uid).child('isActive').val() !== false"
   },
   "storeReviews": {
@@ -78,6 +83,13 @@
   "dashboardNotifications": {
    ".read": "auth != null && root.child('employees').child(auth.uid).exists() && root.child('employees').child(auth.uid).child('isActive').val() !== false",
    ".write": "auth != null && root.child('employees').child(auth.uid).exists() && root.child('employees').child(auth.uid).child('isActive').val() !== false"
+  },
+  "voucherLookup": {
+   ".read": "auth != null && root.child('employees').child(auth.uid).exists() && root.child('employees').child(auth.uid).child('isActive').val() !== false",
+   ".write": "auth != null && root.child('employees').child(auth.uid).exists() && root.child('employees').child(auth.uid).child('isActive').val() !== false",
+   "$code": {
+    ".read": true
+   }
   }
  }
 }
