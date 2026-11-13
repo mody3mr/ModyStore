@@ -1001,3 +1001,28 @@ body.dark-mode .settings-card-head p,body.dark-mode .settings-section-title p,bo
 body.dark-mode .settings-input-wrap,body.dark-mode .settings-textarea-wrap,body.dark-mode .filter-bar,body.dark-mode .modal-actions,body.dark-mode .payment-setting,body.dark-mode .social-setting{background:#172236!important;color:#e2e8f0;border-color:#263449}
 body.dark-mode input,body.dark-mode select,body.dark-mode textarea{background:#172236!important;color:#e2e8f0!important;border-color:#334155!important}
 body.dark-mode table td,body.dark-mode table th{color:#cbd5e1;border-color:#263449}
+
+/* ===== Dark mode fixes (auto) ===== */
+body.dark-mode :is(.analytics-hero-status,.banner-fields-grid input,.banner-fields-grid select,.banner-image-preview,.banner-slide-toolbar,.bulk-waybill-card,.dashboard-notif-icon,.inventory-audit-hero,.inventory-audit-input,.manual-add-item-row input,.manual-add-item-row select,.manual-order-items-list,.manual-order-panel,.manual-order-total,.order-confirmation-box,.payment-check,.payment-setting input:checked~.payment-check,.paymob-security-note,.permission-row,.permissions-matrix,.product-img-large,.review-admin-card,.review-admin-image,.review-publish-toggle,.review-upload-box,.review-upload-box input[type=file],.review-upload-title>i,.reviews-empty,.reviews-rating-note,.save-shield,.settings-card-icon.blue,.settings-card-icon.orange,.settings-card-icon.purple,.settings-hero,.settings-input-wrap,.settings-save-bar,.settings-textarea-wrap textarea,.social-setting){background:#172236!important;color:#e2e8f0;border-color:#263449!important;box-shadow:none}
+body.dark-mode .settings-hero h2{color:#e2e8f0!important}
+body.dark-mode .settings-hero p{color:#94a3b8!important}
+body.dark-mode .settings-input-wrap input{color:#e2e8f0!important}
+body.dark-mode .payment-check{color:#94a3b8!important}
+body.dark-mode .payment-setting b{color:#e2e8f0!important}
+body.dark-mode .settings-save-bar strong{color:#e2e8f0!important}
+body.dark-mode .reviews-empty h3{color:#94a3b8!important}
+body.dark-mode .reviews-rating-note{color:#e2e8f0!important}
+body.dark-mode .reviews-rating-note span{color:#94a3b8!important}
+body.dark-mode .review-publish-toggle{color:#e2e8f0!important}
+body.dark-mode .settings-textarea-wrap textarea{color:#e2e8f0!important}
+body.dark-mode .banner-fields-grid input{color:#e2e8f0!important}
+body.dark-mode .banner-fields-grid select{color:#e2e8f0!important}
+body.dark-mode .banner-slide-toolbar span{color:#e2e8f0!important}
+body.dark-mode [style*="background:#fff"],body.dark-mode [style*="background: #fff"],body.dark-mode [style*="background:#ffffff"],body.dark-mode [style*="background: #ffffff"],body.dark-mode [style*="background:white"],body.dark-mode [style*="background:#f8fafc"],body.dark-mode [style*="background: #f8fafc"],body.dark-mode [style*="background:#f1f5f9"],body.dark-mode [style*="background:#eff6ff"]{background:#172236!important;color:#e2e8f0!important;border-color:#263449!important}
+body.dark-mode [style*="color:#0f172a"],body.dark-mode [style*="color: #0f172a"],body.dark-mode [style*="color:#1e293b"],body.dark-mode [style*="color:#334155"]{color:#e2e8f0!important}
+body.dark-mode .settings-hero h1,body.dark-mode .settings-hero h2,body.dark-mode .settings-hero p,body.dark-mode .settings-status-card *,body.dark-mode .payment-setting *,body.dark-mode .manual-order-panel *,body.dark-mode .manual-order-total *{color:#e2e8f0}
+body.dark-mode input::placeholder,body.dark-mode textarea::placeholder{color:#7c8aa0}
+body.dark-mode input:-webkit-autofill{-webkit-box-shadow:0 0 0 40px #172236 inset!important;-webkit-text-fill-color:#e2e8f0!important}
+body.dark-mode option{background:#172236;color:#e2e8f0}
+@media print{#printRoot,#printRoot *{color:#000!important;background:#fff!important}}
+#shippingCompanyModal .input-group:has(#shippingCompanyApiBaseUrl),#shippingCompanyModal .input-group:has(#shippingCompanyApiKey),#shippingCompanyModal .input-group:has(#shippingCompanyApiSecret){display:none}
