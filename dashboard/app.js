@@ -817,6 +817,7 @@ async function cancelOrderAndRestoreStock(orderId, displayId, reason) {
         restoreClaimed = true;
         for (const item of order.items || []) {
             await runTransaction(ref(db, `products/${item.id}/stock`), current => (Number(current) || 0) + Number(item.qty || 0));
+            await restoreVariant(item);
         }
         updates[`orders/${orderId}/stockRestored`] = true;
         updates[`orders/${orderId}/stockRestoredAt`] = Date.now();
@@ -921,7 +922,7 @@ window.viewOrderDetails = (orderId) => {
         order.items.forEach(item => {
             itemsList.innerHTML += `
                 <div class="order-item-row">
-                    <span>${item.qty}x ${item.name}</span>
+                    <span>${item.qty}x ${__escH(item.name)}</span>
                     <span>${item.qty * item.price} ج.م</span>
                 </div>`;
             subtotal += (item.qty * item.price);
@@ -996,7 +997,7 @@ window.viewOrderDetails = (orderId) => {
         order.items.forEach(item => {
             invItemsList.innerHTML += `
                 <tr>
-                    <td style="padding: 10px; border: 1px solid black; text-align: right;">${item.name}</td>
+                    <td style="padding: 10px; border: 1px solid black; text-align: right;">${__escH(item.name)}</td>
                     <td style="padding: 10px; border: 1px solid black;">${item.qty}</td>
                     <td style="padding: 10px; border: 1px solid black;">${item.price} ج</td>
                     <td style="padding: 10px; border: 1px solid black;">${item.qty * item.price} ج</td>
@@ -1030,7 +1031,7 @@ window.viewOrderDetails = (orderId) => {
     document.getElementById('printPhone2').innerText = c.phone2 || c.altPhone || '-';
     
     
-    const descParts = order.items ? order.items.map(i => `${i.qty}x ${i.name}`).join(' ، ') : '';
+    const descParts = order.items ? order.items.map(i => `${i.qty}x ${__escH(i.name)}`).join(' ، ') : '';
     document.getElementById('printProductsDesc').innerText = descParts;
 
     if (order.paymentMethod && !order.paymentMethod.includes("كاش") && !order.paymentMethod.includes("استلام")) {
@@ -1092,6 +1093,7 @@ window.printDocument = (type) => {
 // استكمال جلب الطلبات
 // ==========================================
 onValue(ref(db, 'orders'), (snapshot) => {
+    window.sweepCancelledStock?.(snapshot);
     try {
         allOrders = [];
         let totalRev = 0;
@@ -1207,7 +1209,7 @@ window.bulkPrintWaybills = () => {
     container.innerHTML = "";
     
     processingOrders.forEach(order => {
-        let descParts = order.items ? order.items.map(i => `${i.qty}x ${i.name}`).join(' ، ') : '';
+        let descParts = order.items ? order.items.map(i => `${i.qty}x ${__escH(i.name)}`).join(' ، ') : '';
         
         let html = `
         <div style="page-break-after: always; width: 100%; height: 100%; margin: 0; padding: 0;">
@@ -1219,7 +1221,7 @@ window.bulkPrintWaybills = () => {
 
                 <div style="display: flex; border-bottom: 3px solid black; padding-bottom: 15px; margin-bottom: 15px;">
                     <div style="flex: 1; border-left: 2px solid black; padding-left: 10px; font-size: 18px;">
-                        <strong>من:</strong> اسم البراند<br>
+                        <strong>من:</strong> مودي ستور<br>
                         <strong>السماح بالفتح:</strong> لا
                     </div>
                 </div>
@@ -1339,7 +1341,7 @@ function renderPurItems() {
     purItems.forEach((item, index) => {
         list.innerHTML += `
             <tr>
-                <td>${item.name}</td>
+                <td>${__escH(item.name)}</td>
                 <td>${item.qty}</td>
                 <td>${item.cost}</td>
                 <td>${item.total}</td>
@@ -1526,7 +1528,7 @@ window.searchOrderForReturn = () => {
     order.items.forEach((item, index) => {
         list.innerHTML += `
             <div style="display:flex; justify-content:space-between; margin-bottom:5px; font-size:14px;">
-                <label><input type="checkbox" checked class="ret-item-cb" data-index="${index}"> ${item.qty}x ${item.name}</label>
+                <label><input type="checkbox" checked class="ret-item-cb" data-index="${index}"> ${item.qty}x ${__escH(item.name)}</label>
                 <span>${item.qty * item.price} ج</span>
             </div>`;
     });
@@ -1628,10 +1630,10 @@ window.renderReturnsTable = () => {
 window.viewReturnDetails = (id) => {
     const r = allReturns.find(x => x.id === id);
     if(!r) return;
-    let itemsStr = r.items.map(i => `${i.qty}x ${i.name}`).join('<br>');
+    let itemsStr = r.items.map(i => `${i.qty}x ${__escH(i.name)}`).join('<br>');
     document.getElementById('viewReturnContent').innerHTML = `
         <div style="font-size:14px; line-height:1.8;">
-            <strong>العميل:</strong> ${r.customer.name} - <span dir="ltr">${r.customer.phone}</span><br>
+            <strong>العميل:</strong> ${__escH(r.customer.name)} - <span dir="ltr">${__escH(r.customer.phone)}</span><br>
             <strong>المنتجات المستردة:</strong><br><div style="background:#f8fafc; padding:10px; border-radius:6px;">${itemsStr}</div>
             <strong>القيمة:</strong> <span style="color:var(--danger); font-weight:bold;">${r.amount} ج.م</span><br>
             <strong>السبب:</strong> ${r.reason}<br>
@@ -1672,7 +1674,8 @@ window.openProductModal = () => {
     if (document.getElementById("prodDiscountPrice")) document.getElementById("prodDiscountPrice").value = ""; 
     if (document.getElementById("prodStock")) document.getElementById("prodStock").value = "10";
     if (document.getElementById("prodOfferDays")) document.getElementById("prodOfferDays").value = "";
-    document.getElementById("prodDesc").value = ""; 
+    document.getElementById("prodDesc").value = "";
+    document.getElementById("prodSizes").value = ""; document.getElementById("prodColors").value = ""; document.getElementById("prodGallery").value = ""; window.__vs = {}; window.renderVariantGrid(); 
     document.getElementById("prodImage").value = ""; 
 
     if (document.getElementById('stockOnlyAlert')) document.getElementById('stockOnlyAlert').style.display = 'none';
@@ -1887,6 +1890,10 @@ window.editProduct = (id) => {
     if (document.getElementById("prodStock")) document.getElementById("prodStock").value = p.stock || 0;
     if (document.getElementById("prodOfferDays")) document.getElementById("prodOfferDays").value = p.offerDays || "";
     document.getElementById("prodDesc").value = p.description || "";
+    document.getElementById("prodSizes").value = Object.values(p.sizes||{}).join(", ");
+    document.getElementById("prodColors").value = Object.values(p.colors||{}).join(", ");
+    document.getElementById("prodGallery").value = Object.values(p.gallery||{}).join("\n");
+    window.__vs = Object.assign({}, p.variantStock||{}); window.renderVariantGrid();
     document.getElementById("prodImage").value = p.imageUrl || ""; 
     
     setTimeout(() => {
@@ -2373,6 +2380,9 @@ onValue(ref(db, 'vouchers'), (snapshot) => {
             });
         }
         window.filterVouchers();
+        const lk = {};
+        allVouchers.forEach(v => { const c = String(v.code || '').toUpperCase().replace(/[.#$\[\]\/]/g, ''); if (c && v.isActive !== false) lk[c] = { code: c, type: v.type || '', value: Number(v.value) || 0, isActive: true, id: v.id }; });
+        set(ref(db, 'voucherLookup'), lk).catch(() => {});
     } catch(err) {
         console.error(err);
     }
@@ -3354,7 +3364,7 @@ if (myProfileBtn && myProfileMenu) {
 // Storefront content manager: editable policies, closure copy and hero banners.
 (() => {
     const defaultSlides = [
-        { title:'اختيارات مميزة لكل يوم', subtitle:'اكتشف أحدث المنتجات والعروض من اسم البراند', imageUrl:'', buttonEnabled:true, buttonLabel:'تسوق الآن', action:'catalog', target:'', isActive:true },
+        { title:'اختيارات مميزة لكل يوم', subtitle:'اكتشف أحدث المنتجات والعروض من مودي ستور', imageUrl:'', buttonEnabled:true, buttonLabel:'تسوق الآن', action:'catalog', target:'', isActive:true },
         { title:'عروض تستحق المشاهدة', subtitle:'تابع التخفيضات المتاحة قبل انتهاء مدتها', imageUrl:'', buttonEnabled:true, buttonLabel:'شاهد العروض', action:'offers', target:'', isActive:true }
     ];
     let slides = [];
@@ -4088,7 +4098,7 @@ if (myProfileBtn && myProfileMenu) {
                         <svg class="bulk-stable-barcode"></svg>
                     </div>
                     <div class="waybill-grid">
-                        <div><strong>من:</strong> اسم البراند<br><strong>السماح بالفتح:</strong> لا</div>
+                        <div><strong>من:</strong> مودي ستور<br><strong>السماح بالفتح:</strong> لا</div>
                         <div class="bulk-waybill-qr"></div>
                     </div>
                     <div class="waybill-recipient">
@@ -4202,7 +4212,7 @@ if (myProfileBtn && myProfileMenu) {
             for(const item of manualOrderItems){
                 const snap=await get(ref(db,`products/${item.id}`));
                 const stock=snap.exists()?numP(snap.val().stock):0;
-                if(stock<item.qty)throw new Error(`المخزون غير كافٍ للمنتج: ${item.name}`);
+                if(stock<item.qty)throw new Error(`المخزون غير كافٍ للمنتج: ${__escH(item.name)}`);
             }
             const newRef=await push(ref(db,'orders'),order);
             for(const item of manualOrderItems){
@@ -4295,6 +4305,7 @@ if (myProfileBtn && myProfileMenu) {
                 if (!addStock) return window.showAlert('اكتب كمية صحيحة لإضافتها للمخزون.', 'warning');
                 const p = (allProducts||[]).find(x=>x.id===editingProductId);
                 if (!p) return window.showAlert('المنتج غير موجود.', 'error');
+                if (p.variantStock) return window.showAlert('هذا المنتج له مخزون لكل مقاس. عدّله من نافذة تعديل المنتج.', 'warning');
                 await update(ref(db,`products/${editingProductId}`),{stock:numP(p.stock)+addStock});
                 await push(ref(db,'inventoryMovements'),cleanData({
                     productId:p.id, productName:p.name, before:numP(p.stock), after:numP(p.stock)+addStock,
@@ -4313,9 +4324,13 @@ if (myProfileBtn && myProfileMenu) {
         const price=numP(document.getElementById('prodPrice')?.value);
         const discountRaw=document.getElementById('prodDiscountPrice')?.value;
         const discount=discountRaw==='' ? null : numP(discountRaw);
-        const stock=Math.max(0,parseInt(document.getElementById('prodStock')?.value,10)||0);
+        let stock=Math.max(0,parseInt(document.getElementById('prodStock')?.value,10)||0);
         const category=document.getElementById('prodCategory')?.value||'';
         const description=document.getElementById('prodDesc')?.value||'';
+        const splitList=(v,max)=>String(v||'').split(/[,،\n]/).map(x=>x.trim()).filter(Boolean).slice(0,max);
+        const sizes=splitList(document.getElementById('prodSizes')?.value,12), colors=splitList(document.getElementById('prodColors')?.value,12);
+        const gallery=String(document.getElementById('prodGallery')?.value||'').split('\n').map(x=>x.trim()).filter(x=>/^https:\/\//.test(x)).slice(0,6);
+        const vsMap=window.collectVariantStock(sizes,colors); if(vsMap) stock=Object.values(vsMap).reduce((t,n)=>t+n,0);
         const image=document.getElementById('prodImage')?.value.trim()||'';
         const duration=numP(document.getElementById('prodOfferDuration')?.value);
         const unit=document.getElementById('prodOfferUnit')?.value||'hours';
@@ -4325,7 +4340,7 @@ if (myProfileBtn && myProfileMenu) {
 
         const data=cleanData({
             name, price, discountPrice:discount && discount>0 ? discount : null, stock, category,
-            description, imageUrl:image||'https://via.placeholder.com/300',
+            description, sizes, colors, gallery, variantStock: vsMap||null, imageUrl:image||'https://via.placeholder.com/300',
             createdAt:Date.now()
         });
 
@@ -4857,8 +4872,8 @@ if (myProfileBtn && myProfileMenu) {
     };
     const buildWhatsAppMessage = (order) => {
         const id = order.displayId || order.orderId || order.dbId;
-        const items = (order.items || []).map(i => `• ${i.name} × ${i.qty} — ${moneyFinal(i.qty * i.price)}`).join('\n');
-        return `مرحباً ${order.customer?.name || ''} 👋\n\nتم تجهيز طلبك #${id} للمراجعة.\n\nالمنتجات:\n${items || 'لا توجد منتجات'}\n\nإجمالي الطلب: ${moneyFinal(order.total)}\n\nبرجاء تأكيد الطلب أو إلغائه من الأزرار الموجودة في رسالة WhatsApp.`;
+        const items = (order.items || []).map(i => `• ${__escH(i.name)} × ${i.qty} — ${moneyFinal(i.qty * i.price)}`).join('\n');
+        return `مرحباً ${__escH(order.customer?.name || '')} 👋\n\nتم تجهيز طلبك #${id} للمراجعة.\n\nالمنتجات:\n${items || 'لا توجد منتجات'}\n\nإجمالي الطلب: ${moneyFinal(order.total)}\n\nبرجاء تأكيد الطلب أو إلغائه من الأزرار الموجودة في رسالة WhatsApp.`;
     };
     window.sendOrderConfirmationWhatsApp = async (order) => {
         const phone = normalizeEgyptPhone(order?.customer?.phone);
@@ -5221,3 +5236,50 @@ if (myProfileBtn && myProfileMenu) {
     ensureManualSettings();
     setTimeout(ensureManualSettings, 800);
 })();
+
+
+// ---------- مخزون لكل مقاس/لون ----------
+window.__vs = {};
+const vsSplit = v => String(v || '').split(/[,،\n]/).map(x => x.trim()).filter(Boolean).slice(0, 12);
+const vsKey = (s, c) => String(s).replace(/[.#$\[\]\/]/g, '_') + '~' + String(c).replace(/[.#$\[\]\/]/g, '_');
+const vsEsc = x => String(x).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+window.renderVariantGrid = () => {
+    const box = document.getElementById('prodVariantBox'); if (!box) return;
+    box.querySelectorAll('input[data-k]').forEach(i => { window.__vs[i.dataset.k] = Math.max(0, parseInt(i.value, 10) || 0); });
+    const S = vsSplit(document.getElementById('prodSizes')?.value), C = vsSplit(document.getElementById('prodColors')?.value);
+    if (!S.length && !C.length) { box.innerHTML = ''; return; }
+    const rows = []; (S.length ? S : ['']).forEach(s => (C.length ? C : ['']).forEach(c => rows.push([s, c])));
+    box.innerHTML = '<label>المخزون لكل مقاس / لون</label><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px">' +
+        rows.map(([s, c]) => `<div><small>${vsEsc([s, c].filter(Boolean).join(' - '))}</small><input type="number" min="0" data-k="${vsEsc(vsKey(s, c))}" value="${window.__vs[vsKey(s, c)] || 0}"></div>`).join('') + '</div>';
+};
+window.collectVariantStock = (S, C) => {
+    if (!S.length && !C.length) return null;
+    document.querySelectorAll('#prodVariantBox input[data-k]').forEach(i => { window.__vs[i.dataset.k] = Math.max(0, parseInt(i.value, 10) || 0); });
+    const out = {}; (S.length ? S : ['']).forEach(s => (C.length ? C : ['']).forEach(c => { out[vsKey(s, c)] = window.__vs[vsKey(s, c)] || 0; }));
+    return out;
+};
+['prodSizes', 'prodColors'].forEach(id => document.getElementById(id)?.addEventListener('input', () => window.renderVariantGrid()));
+async function restoreVariant(item) {
+    if (!item.size && !item.color) return;
+    const k = vsKey(item.size || '', item.color || '');
+    const s = await get(ref(db, `products/${item.id}/variantStock/${k}`));
+    if (s.exists()) await runTransaction(ref(db, `products/${item.id}/variantStock/${k}`), cur => (Number(cur) || 0) + Number(item.qty || 0));
+}
+// استرجاع المخزون تلقائيًا للطلبات اللي العميل لغاها بنفسه
+window.restoreStockForOrder = async (id, order) => {
+    const claim = await runTransaction(ref(db, `orders/${id}/stockRestoreInProgress`), cur => cur === true ? undefined : true);
+    if (!claim.committed) return;
+    try {
+        for (const item of order.items || []) {
+            await runTransaction(ref(db, `products/${item.id}/stock`), cur => (Number(cur) || 0) + Number(item.qty || 0));
+            await restoreVariant(item);
+        }
+        await update(ref(db, `orders/${id}`), { stockRestored: true, stockRestoredAt: Date.now(), stockRestoreInProgress: null });
+    } catch (e) { await update(ref(db, `orders/${id}`), { stockRestoreInProgress: null }).catch(() => {}); }
+};
+window.sweepCancelledStock = snap => {
+    if (!window.currentUserRole) { setTimeout(() => window.sweepCancelledStock(snap), 4000); return; }
+    snap.forEach(ch => { const o = ch.val(); if (o.status === 'ملغي' && o.stockDeducted === true && o.stockRestored !== true && o.stockRestoreInProgress !== true) window.restoreStockForOrder(ch.key, o); });
+};
+
+function __escH(x){return String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
