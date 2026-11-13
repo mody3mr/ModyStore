@@ -1035,3 +1035,13 @@ body.dark-mode .settings-card-head h3{color:#e2e8f0}body.dark-mode .settings-car
 body.dark-mode [style*="#f7fbff"],body.dark-mode [style*="#fbfdff"],body.dark-mode [style*="#f8fbff"],body.dark-mode [style*="linear-gradient(135deg,#fff"],body.dark-mode [style*="linear-gradient(180deg,#fff"]{background:#172236!important;border-color:#263449!important}
 
 body.dark-mode :is(.btn-add,.btn-save,.btn-view){background:#2563eb!important;color:#fff!important}
+
+:root{--panel-white:#ffffff;--panel-soft:#f8fafc;--muted-text:#64748b}
+body.dark-mode{--panel-white:#111827;--panel-soft:#172236;--muted-text:#94a3b8}
+
+#prodVariantBox,.input-group:has(#prodStock){display:none!important}
+.opt-picker{display:flex;flex-wrap:wrap;gap:8px}.opt-pick{border:1px solid var(--border);background:var(--panel-soft);color:var(--text-dark);padding:7px 14px;border-radius:8px;cursor:pointer;font-weight:700;font-family:inherit}
+.opt-pick.on{background:#2563eb;border-color:#2563eb;color:#fff}.opt-pick.add{border-style:dashed}
+.se-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;margin:12px 0}.se-grid div{display:flex;flex-direction:column;gap:4px}.se-grid small{color:var(--muted-text)}
+
+@media print{#invoicePrintContainer,#invoicePrintContainer *{background:#fff!important;color:#000!important}}
