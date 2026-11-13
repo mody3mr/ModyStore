@@ -183,14 +183,14 @@
     <!-- ================= المحتوى الرئيسي ================= -->
     <main class="main-content">
         <header class="topbar">
-            <div id="sidebarToggle" style="color: #64748b; font-weight: 600; cursor: pointer; font-size: 22px;">
+            <div id="sidebarToggle" style="color: var(--muted-text); font-weight: 600; cursor: pointer; font-size: 22px;">
                 <i class="fas fa-bars"></i>
             </div>
             
             <div style="display: flex; align-items: center; gap: 20px;">
                 <button id="darkModeToggle" class="icon-toolbar-btn" type="button" title="الوضع الداكن" aria-label="الوضع الداكن"><i class="fas fa-moon"></i></button>
                 <div class="user-profile" id="notifBtn" style="position: relative; cursor: pointer;">
-                    <i class="fas fa-bell" style="font-size: 22px; color: #64748b;"></i>
+                    <i class="fas fa-bell" style="font-size: 22px; color: var(--muted-text);"></i>
                     <span id="notifCount" style="position:absolute; top:-5px; right:-8px; background:var(--danger); color:white; font-size:11px; padding:2px 6px; border-radius:50%; display:none;">0</span>
                     <div class="profile-dropdown" id="notifDropdown" style="width: 280px; right: 0; left: auto;">
                         <div class="dropdown-header" style="display: flex; justify-content: space-between; align-items: center;">
@@ -231,7 +231,7 @@
                 </div>
                 <div class="stat-cards">
                     <div class="stat-card clickable-card" onclick="goToOrdersTab('archived')">
-                        <div class="stat-icon" style="color: #3b82f6; background: #eff6ff;">
+                        <div class="stat-icon" style="color: #3b82f6; background: var(--panel-soft);">
                             <i class="fas fa-shopping-bag"></i>
                         </div>
                         <div class="stat-info">
@@ -272,7 +272,7 @@
                 <div id="analyticsStatusCards" class="stat-cards analytics-status-cards">
                     <div class="stat-card status-summary-card"><div class="stat-icon" style="color:#10b981;background:#dcfce7;"><i class="fas fa-circle-check"></i></div><div class="stat-info"><h3>الطلبات التي تم تسليمها</h3><p id="statDeliveredOrders">0</p></div></div>
                     <div class="stat-card status-summary-card"><div class="stat-icon" style="color:#8b5cf6;background:#f3e8ff;"><i class="fas fa-truck"></i></div><div class="stat-info"><h3>إجمالي الطلبات التي تم شحنها</h3><p id="statShippedOrders">0</p></div></div>
-                    <div class="stat-card status-summary-card"><div class="stat-icon" style="color:#3b82f6;background:#eff6ff;"><i class="fas fa-box"></i></div><div class="stat-info"><h3>طلبات قيد التجهيز حالياً</h3><p id="statProcessingOrders">0</p></div></div>
+                    <div class="stat-card status-summary-card"><div class="stat-icon" style="color:#3b82f6;background:var(--panel-soft);"><i class="fas fa-box"></i></div><div class="stat-info"><h3>طلبات قيد التجهيز حالياً</h3><p id="statProcessingOrders">0</p></div></div>
                 </div>
 
                 <div class="analytics-section-head"><div><span class="section-kicker">BUSINESS KPIS</span><h3>مؤشرات الأداء</h3></div><p>أرقام تساعدك على اتخاذ قرار سريع.</p></div>
@@ -345,7 +345,7 @@
                     <button class="custom-tab-btn" id="tabArchivedOrders" onclick="switchOrderTab('archived', this)">أرشيف الطلبات</button>
                 </div>
 
-                <div class="stat-card" style="margin-bottom: 20px; background: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); display: inline-block;">
+                <div class="stat-card" style="margin-bottom: 20px; background: var(--panel-white); padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); display: inline-block;">
                     <h3 style="margin: 0; font-size: 16px;">الطلبات المعروضة حالياً: <span id="filteredOrdersCount" style="color: var(--primary); font-weight: bold; font-size: 20px;">0</span></h3>
                 </div>
                 
@@ -531,6 +531,7 @@
                         <p class="inventory-subtitle">تابع الكميات الحالية وسجل الجرد الفعلي بسهولة.</p>
                     </div>
                     <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                        <button class="btn-save" style="background:#2563eb;" onclick="openStockEdit()"><i class="fas fa-pen-to-square"></i> تعديل المخزون</button>
                         <button class="btn-save" style="background:#10b981;" onclick="exportInventoryShortages()"><i class="fas fa-file-excel"></i> شيت نواقص Excel</button>
                         <button class="btn-save" style="background:#ef4444;" onclick="exportInventoryShortagesPDF()"><i class="fas fa-file-pdf"></i> PDF النواقص</button>
                     </div>
@@ -543,7 +544,7 @@
 
                 <div id="inventory-current-panel">
                     <div class="stat-cards">
-                        <div class="stat-card"><div class="stat-icon" style="color:#3b82f6;background:#eff6ff;"><i class="fas fa-boxes-stacked"></i></div><div class="stat-info"><h3>إجمالي المنتجات</h3><p id="inventoryProductsCount">0</p></div></div>
+                        <div class="stat-card"><div class="stat-icon" style="color:#3b82f6;background:var(--panel-soft);"><i class="fas fa-boxes-stacked"></i></div><div class="stat-info"><h3>إجمالي المنتجات</h3><p id="inventoryProductsCount">0</p></div></div>
                         <div class="stat-card"><div class="stat-icon" style="color:#ef4444;background:#fef2f2;"><i class="fas fa-triangle-exclamation"></i></div><div class="stat-info"><h3>المنتجات الناقصة</h3><p id="inventoryShortageCount">0</p></div></div>
                         <div class="stat-card"><div class="stat-icon" style="color:#10b981;background:#dcfce7;"><i class="fas fa-cubes"></i></div><div class="stat-info"><h3>إجمالي الكميات الحالية</h3><p id="inventoryUnitsCount">0</p></div></div>
                     </div>
@@ -761,8 +762,8 @@
 
                 <div class="stat-cards reviews-stats">
                     <div class="stat-card"><div class="stat-icon" style="color:#8b5cf6;background:#f3e8ff;"><i class="fas fa-images"></i></div><div class="stat-info"><h3>إجمالي الصور</h3><p id="reviewsTotalCount">0</p></div></div>
-                    <div class="stat-card"><div class="stat-icon" style="color:#3b82f6;background:#eff6ff;"><i class="fas fa-images"></i></div><div class="stat-info"><h3>صور منشورة</h3><p id="reviewsPublishedCount">0</p></div></div>
-                    <div class="stat-card"><div class="stat-icon" style="color:#64748b;background:#f1f5f9;"><i class="fas fa-eye-slash"></i></div><div class="stat-info"><h3>صور مخفية</h3><p id="reviewsHiddenCount">0</p></div></div>
+                    <div class="stat-card"><div class="stat-icon" style="color:#3b82f6;background:var(--panel-soft);"><i class="fas fa-images"></i></div><div class="stat-info"><h3>صور منشورة</h3><p id="reviewsPublishedCount">0</p></div></div>
+                    <div class="stat-card"><div class="stat-icon" style="color:var(--muted-text);background:var(--panel-soft);"><i class="fas fa-eye-slash"></i></div><div class="stat-info"><h3>صور مخفية</h3><p id="reviewsHiddenCount">0</p></div></div>
                 </div>
 
                 <div class="filter-bar reviews-filter-bar">
@@ -778,7 +779,8 @@
                     <button class="custom-tab-btn active" onclick="switchOffersTab('current', this)">العروض الحالية</button>
                     <button class="custom-tab-btn" onclick="switchOffersTab('previous', this)">العروض السابقة</button>
                 </div>
-                <div id="currentOffersPanel" class="card offers-panel"><div class="table-scroll"><table><thead><tr><th>المنتج</th><th>السعر الأساسي</th><th>سعر العرض</th><th>المدة</th><th>ينتهي في</th><th>إجراء</th></tr></thead><tbody id="offersTableBody"></tbody></table></div></div>
+                <input id="offersSearch" type="search" placeholder="ابحث باسم المنتج..." oninput="filterOffers()" style="margin-bottom:12px;max-width:380px;width:100%;background:var(--panel-soft);border:1px solid var(--border);color:var(--text-dark);padding:10px 14px;border-radius:8px">
+<div id="currentOffersPanel" class="card offers-panel"><div class="table-scroll"><table><thead><tr><th>المنتج</th><th>السعر الأساسي</th><th>سعر العرض</th><th>المدة</th><th>ينتهي في</th><th>إجراء</th></tr></thead><tbody id="offersTableBody"></tbody></table></div></div>
                 <div id="previousOffersPanel" class="card offers-panel" style="display:none;"><div class="table-scroll"><table><thead><tr><th>رقم الطلب</th><th>العميل</th><th>رقم الهاتف</th><th>قيمة الطلب</th><th>قيمة الخصم</th><th>التفاصيل</th></tr></thead><tbody id="previousOffersTableBody"></tbody></table></div></div>
             </div>
 
@@ -884,7 +886,7 @@
                 </section>
 
 
-                <div class="settings-section-title">
+                <div id="legacyHiddenSections" style="display:none" aria-hidden="true"><div class="settings-section-title">
                     <div><span class="section-kicker">PAYMENTS</span><h3>بوابة الدفع Paymob</h3></div>
                     <p>إعدادات الربط الخاصة بالدفع الإلكتروني — المفاتيح السرية لا تُحفظ في الواجهة.</p>
                 </div>
@@ -916,7 +918,7 @@
                     </div>
                     <div class="push-status-row"><span id="pushSetupStatus" class="push-status-pill">لم يتم تهيئة الإشعارات بعد</span><button type="button" class="btn-save" style="background:#10b981;" onclick="window.enableMobilePush?.()"><i class="fas fa-bell"></i> تفعيل إشعارات هذا الجهاز</button></div>
                 </section>
-                <div class="settings-section-title">
+                </div><div class="settings-section-title">
                     <div><span class="section-kicker">ORDERS</span><h3>تأكيد الطلب عبر WhatsApp</h3></div>
                     <p>بعد إنشاء الطلب يرسل الـBackend رسالة تأكيد للعميل مباشرة، ثم تتحدث الحالة عند الضغط على زر التأكيد أو الإلغاء.</p>
                 </div>
@@ -986,7 +988,7 @@
                 </div>
 
                 <div class="grid-2">
-                    <div style="background: white; border: 1px solid var(--border); padding: 20px; border-radius: 12px;">
+                    <div style="background: var(--panel-white); border: 1px solid var(--border); padding: 20px; border-radius: 12px;">
                         <h4 style="color: var(--primary); margin-bottom: 15px;">المبيعات حسب طرق الدفع</h4>
                         <div id="reportPaymentBreakdown"></div>
                         <div id="reportDiscountBox" style="margin-top:14px;padding:12px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;text-align:center;">
@@ -999,7 +1001,7 @@
                         </div>
                     </div>
 
-                    <div style="background: white; border: 1px solid var(--border); padding: 20px; border-radius: 12px; max-height: 350px; overflow-y: auto;">
+                    <div style="background: var(--panel-white); border: 1px solid var(--border); padding: 20px; border-radius: 12px; max-height: 350px; overflow-y: auto;">
                         <h4 style="color: var(--primary); margin-bottom: 15px;">المنتجات الأكثر مبيعاً <i class="fas fa-fire" style="color: var(--accent);"></i></h4>
                         <input type="text" id="searchReportProducts" placeholder="ابحث في المنتجات المباعة..." onkeyup="filterReportProducts()" style="width: 100%; padding: 8px; margin-bottom: 10px; border-radius: 6px; border: 1px solid var(--border); font-family: 'Cairo'; outline: none;">
                         <div id="reportTopProducts"></div>
@@ -1075,7 +1077,7 @@
         <div class="modal-overlay" id="scannerModal">
             <div class="modal animate__animated animate__zoomIn" style="width: 450px;">
                 <h3><i class="fas fa-qrcode"></i> سكانر لتأكيد الشحن</h3>
-                <p style="text-align: center; margin-bottom: 15px; font-size: 14px; color: #64748b;">وجّه الكاميرا إلى الباركود الشريطي أو QR على البوليصة. يتم دعم CODE128 وEAN وQR مع فاصل لمنع التكرار.</p>
+                <p style="text-align: center; margin-bottom: 15px; font-size: 14px; color: var(--muted-text);">وجّه الكاميرا إلى الباركود الشريطي أو QR على البوليصة. يتم دعم CODE128 وEAN وQR مع فاصل لمنع التكرار.</p>
                 <div id="qr-reader" style="width: 100%; aspect-ratio: 2/1; border-radius: 8px; overflow: hidden; border: 2px solid var(--border);"></div>
                 <div style="display:flex;gap:8px;margin-top:12px;align-items:center;">
                     <input id="manualScanOrderInput" type="text" inputmode="numeric" placeholder="اكتب رقم الطلب أو الكود السري إذا لم يقرأ السكانر" style="flex:1;padding:12px;border:1px solid var(--border);border-radius:8px;font-family:Cairo;direction:ltr;text-align:center;">
@@ -1115,7 +1117,7 @@
                         </div>
                     </div>
 
-                    <div style="background: #f8fafc; padding: 15px; border-radius: 12px; border: 1px solid var(--border);">
+                    <div style="background: var(--panel-soft); padding: 15px; border-radius: 12px; border: 1px solid var(--border);">
                         <div id="oCancelReasonBox" style="display: none; background: #fee2e2; border: 1px solid #f87171; padding: 10px; border-radius: 8px; margin-bottom: 15px;">
                             <strong style="color: #b91c1c;"><i class="fas fa-exclamation-circle"></i> سبب الإلغاء:</strong>
                             <p id="oCancelReasonText" style="color: #991b1b; margin-top: 5px; font-weight: bold;"></p>
@@ -1174,7 +1176,7 @@
                     <div class="input-group"><label>رقم الفاتورة الخارجي (اختياري)</label><input type="text" id="purInvoiceNo" inputmode="numeric" pattern="[0-9]*" maxlength="30"></div>
                 </div>
                 
-                <div style="background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 15px;">
+                <div style="background: var(--panel-soft); padding: 15px; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 15px;">
                     <label style="font-weight:bold; color:var(--primary); display:block; margin-bottom:10px;">إضافة منتجات للفاتورة:</label>
                     <div class="grid-2" style="align-items:end;">
                         <div class="input-group" style="margin:0;"><label>المنتج</label><select id="purProductSelect"><option value="">اختر المنتج...</option></select></div>
@@ -1246,7 +1248,7 @@
                     <button class="btn-save" onclick="searchOrderForReturn()">بحث <i class="fas fa-search"></i></button>
                 </div>
                 
-                <div id="returnOrderDetailsDiv" style="display:none; background:#f8fafc; padding:15px; border-radius:8px; border:1px solid var(--border); margin-bottom:15px;">
+                <div id="returnOrderDetailsDiv" style="display:none; background:var(--panel-soft); padding:15px; border-radius:8px; border:1px solid var(--border); margin-bottom:15px;">
                     <div style="margin-bottom:10px;"><strong>بيانات العميل:</strong> <span id="retCustName"></span> - <span id="retCustPhone" dir="ltr"></span></div>
                     <label style="font-weight:bold; color:var(--primary); display:block; margin-bottom:5px;">اختر المنتجات المراد إرجاعها:</label>
                     <div id="retOrderItemsList" style="margin-bottom: 15px;"></div>
@@ -1312,8 +1314,8 @@
                 </div>
                 <div class="input-group"><label>القسم</label><select id="prodCategory"></select></div>
                 <div class="input-group"><label>الوصف التفصيلي</label><textarea id="prodDesc" rows="4"></textarea></div>
-                <div class="input-group"><label>المقاسات (مفصولة بفاصلة)</label><input type="text" id="prodSizes" placeholder="S, M, L, XL"></div>
-                <div class="input-group"><label>الألوان (مفصولة بفاصلة)</label><input type="text" id="prodColors" placeholder="أسود, أبيض"></div>
+                <div class="input-group"><label>المقاسات</label><input type="hidden" id="prodSizes"><div id="prodSizesPicker" class="opt-picker"></div></div>
+                <div class="input-group"><label>الألوان</label><input type="hidden" id="prodColors"><div id="prodColorsPicker" class="opt-picker"></div></div>
                 <div class="input-group" id="prodVariantBox"></div>
                 <div class="input-group"><label>رابط الصورة الرئيسية</label><input type="text" id="prodImage"></div>
                 <div class="input-group"><label>صور إضافية (رابط في كل سطر)</label><textarea id="prodGallery" rows="3"></textarea></div>
@@ -1346,7 +1348,7 @@
             <div class="modal animate__animated animate__zoomIn" style="width: 700px;">
                 <h3 id="empModalTitle">إضافة موظف / مشرف</h3>
                 <div class="grid-2"><div class="input-group"><label>الاسم</label><input type="text" id="empName"></div><div class="input-group"><label>تليفون</label><input type="tel" id="empPhone" inputmode="numeric" pattern="[0-9]*"></div></div>
-                <div style="background: #eff6ff; padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #bfdbfe;">
+                <div style="background: var(--panel-soft); padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #bfdbfe;">
                     <strong style="color:var(--secondary); display:block; margin-bottom:10px;"><i class="fas fa-lock"></i> بيانات تسجيل الدخول:</strong>
                     <div class="grid-2"><div class="input-group"><label>البريد الإلكتروني</label><input type="email" id="empEmail" dir="ltr"></div><div class="input-group"><label>كلمة المرور</label><input type="text" id="empPass" dir="ltr"></div></div>
                 </div>
@@ -1378,8 +1380,8 @@
 
     <!-- !!! تم نقل حاويات الطباعة أسفل الصفحة لتجنب مشكلة الطباعة البيضاء !!! -->
     <!-- ================= تصميم بوليصة الشحن للطباعة ================= -->
-    <div id="waybillPrintArea" class="print-waybill-area" style="display:none; background:white;">
-        <div class="bosta-waybill" style="width: 100%; border: 3px solid black; font-family: 'Cairo', sans-serif; direction: rtl; background: white; color: black; box-sizing: border-box;">
+    <div id="waybillPrintArea" class="print-waybill-area" style="display:none; background:var(--panel-white);">
+        <div class="bosta-waybill" style="width: 100%; border: 3px solid black; font-family: 'Cairo', sans-serif; direction: rtl; background: var(--panel-white); color: black; box-sizing: border-box;">
             <div style="text-align: center; border-bottom: 3px solid black; padding-bottom: 15px; margin-bottom: 15px;">
                 <div style="font-size: 32px; font-weight: 900; margin-bottom: 10px;">ModyStore <i class="fas fa-shirt"></i></div>
                 <!-- الباركود بحجم كبير جداً مالي الشاشة -->
@@ -1421,7 +1423,7 @@
                 <span id="printCodAmount" style="font-size:40px; font-weight:900;"></span>
             </div>
 
-            <div id="paidAmountContainer" style="text-align: center; font-size: 20px; display:none; background-color: #f8fafc; padding: 20px; border: 3px solid black; border-radius: 12px; margin-bottom: 15px;">
+            <div id="paidAmountContainer" style="text-align: center; font-size: 20px; display:none; background-color: var(--panel-soft); padding: 20px; border: 3px solid black; border-radius: 12px; margin-bottom: 15px;">
                 <strong>طريقة الدفع:</strong> <span id="printPaymentMethodLabel" style="font-weight:bold;"></span> <br>
                 <strong>القيمة:</strong> <span id="printPaidAmount" style="font-weight:bold;"></span>
             </div>
@@ -1433,9 +1435,9 @@
     </div>
     
     <!-- ================= تصميم الفاتورة المنفصلة ================= -->
-    <div id="invoicePrintContainer" class="print-invoice-area" style="display:none; background:white; color:black; font-family:'Cairo';">
+    <div id="invoicePrintContainer" class="print-invoice-area" style="display:none; background:var(--panel-white); color:black; font-family:'Cairo';">
         <div style="text-align: center; border-bottom: 2px solid black; padding-bottom: 10px; margin-bottom: 20px;">
-            <h1 style="margin: 0; font-size: 28px;">ModyStore</h1>
+            <img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTYiIGZpbGw9IiMwZjE3MmEiLz48cGF0aCBkPSJNMTcgNDVWMjBsMTUgMTYgMTUtMTZ2MjUiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLXdpZHRoPSI2IiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz48cGF0aCBkPSJNMTUgNTNoMzQiIHN0cm9rZT0iIzNiODJmNiIgc3Ryb2tlLXdpZHRoPSI0IiBzdHJva2UtbGluZWNhcD0icm91bmQiLz48L3N2Zz4=" width="72" height="72" alt="" style="display:block;margin:0 auto 6px"><h1 style="margin: 0; font-size: 28px;">ModyStore</h1>
             <p style="margin: 5px 0 0 0; font-size: 16px;">فاتورة طلب عميل</p>
         </div>
         <div style="display: flex; justify-content: space-between; margin-bottom: 20px; font-size: 14px;">
@@ -1451,7 +1453,7 @@
         </div>
         <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 14px; text-align: center;">
             <thead>
-                <tr style="background-color: #f1f5f9;">
+                <tr style="background-color: var(--panel-soft);">
                     <th style="padding: 10px; border: 1px solid black; text-align: right;">المنتج</th>
                     <th style="padding: 10px; border: 1px solid black;">الكمية</th>
                     <th style="padding: 10px; border: 1px solid black;">السعر</th>
@@ -1461,15 +1463,15 @@
             <tbody id="invItemsList"></tbody>
         </table>
         <div style="text-align: left; font-size: 16px; border-top: 2px solid black; padding-top: 10px;">
-            <p style="margin: 5px 0;"><strong>الإجمالي الفرعي:</strong> <span id="invSubtotal"></span></p>
+            <p style="margin: 5px 0;"><strong>الإجمالي قبل الخصم:</strong> <span id="invSubtotal"></span></p>
             <p style="margin: 5px 0; color: var(--accent);"><strong>الخصم:</strong> <span id="invDiscount"></span></p>
-            <p style="margin: 10px 0 0 0; font-size: 22px; font-weight: bold;"><strong>الصافي للدفع:</strong> <span id="invTotal"></span></p>
+            <p style="margin: 5px 0;"><strong>الإجمالي بعد الخصم:</strong> <span id="invAfter"></span></p><p style="margin: 5px 0;"><strong>الشحن:</strong> <span id="invShipping"></span></p><p style="margin: 10px 0 0 0; font-size: 22px; font-weight: bold;"><strong>الصافي للدفع:</strong> <span id="invTotal"></span></p>
         </div>
         <div style="text-align: center; margin-top: 40px; font-size: 14px; border-top: 1px dashed black; padding-top: 15px;">شكراً لتسوقكم معنا!</div>
     </div>
 
     <!-- ================= حاوية الطباعة المجمعة ================= -->
-    <div id="bulkPrintContainer" class="bulk-print-container" style="display:none; background:white;"></div>
+    <div id="bulkPrintContainer" class="bulk-print-container" style="display:none; background:var(--panel-white);"></div>
 
     <!-- ================= حاوية الطباعة الفعلية (كل الطباعة تخرج من هنا) ================= -->
     <div id="printRoot"></div>
@@ -1501,5 +1503,13 @@
     </div>
     <!-- ربط ملف الجافاسكريبت -->
     <script type="module" src="app.js?v=20260912-3"></script>
+
+<div id="stockEditModal" class="modal"><div class="modal-content" style="max-width:560px">
+  <h3 style="margin-top:0">تعديل المخزون</h3>
+  <div class="input-group"><label>المنتج</label><select id="seProduct" onchange="seLoadProduct()"></select></div>
+  <div id="seGrid" class="se-grid"></div>
+  <div id="seReasonWrap" class="input-group" style="display:none"><label>سبب التعديل *</label><select id="seReason"><option value="">اختر السبب...</option><option>جرد فعلي</option><option>تصحيح خطأ</option><option>استلام بضاعة</option><option>تالف / هالك</option><option>مرتجع</option><option>أخرى</option></select></div>
+  <div style="display:flex;gap:10px;margin-top:14px"><button class="btn-save" onclick="seSave()">حفظ المخزون</button><button class="btn-cancel" style="background:#64748b;color:#fff;border:0;padding:12px 25px;border-radius:8px;cursor:pointer" onclick="closeModal('stockEditModal')">إلغاء</button></div>
+</div></div>
 </body>
 </html>
