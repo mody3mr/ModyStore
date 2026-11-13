@@ -8,7 +8,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="style.css?v=20260912-3">
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%231e293b'/%3E%3Cpath d='M34 8 17 36h12l-2 20 20-30H35z' fill='%23f59e0b'/%3E%3C/svg%3E">
+    <link rel="icon" href="../favicon.svg" type="image/svg+xml"><meta name="robots" content="noindex,nofollow">
     
     <!-- مكتبات التفاعل والأنيميشن -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
@@ -114,7 +114,7 @@
 
     <div id="authGate" class="auth-gate" aria-live="polite">
         <div class="auth-gate-card">
-            <div class="auth-gate-logo"><i class="fas fa-shirt"></i></div>
+            <div class="auth-gate-logo"><img src="../logo.svg" alt="" width="56" height="56"></div>
             <div class="auth-gate-spinner"></div>
             <strong>جاري تأمين لوحة التحكم</strong>
             <span>يتم التحقق من الحساب والصلاحيات قبل إظهار أي بيانات.</span>
@@ -128,7 +128,7 @@
     <!-- ================= القائمة الجانبية ================= -->
     <aside class="sidebar" id="sidebar">
         <div class="brand">
-            <i class="fas fa-shirt" style="color: #f59e0b;"></i> 
+            <img src="../logo.svg" alt="" width="26" height="26" style="border-radius:7px;vertical-align:middle"> 
             <span class="nav-text" style="font-family: Arial, sans-serif;">ModyStore</span>
         </div>
         <ul class="nav-links">
@@ -1312,7 +1312,11 @@
                 </div>
                 <div class="input-group"><label>القسم</label><select id="prodCategory"></select></div>
                 <div class="input-group"><label>الوصف التفصيلي</label><textarea id="prodDesc" rows="4"></textarea></div>
-                <div class="input-group"><label>رابط الصورة</label><input type="text" id="prodImage"></div>
+                <div class="input-group"><label>المقاسات (مفصولة بفاصلة)</label><input type="text" id="prodSizes" placeholder="S, M, L, XL"></div>
+                <div class="input-group"><label>الألوان (مفصولة بفاصلة)</label><input type="text" id="prodColors" placeholder="أسود, أبيض"></div>
+                <div class="input-group" id="prodVariantBox"></div>
+                <div class="input-group"><label>رابط الصورة الرئيسية</label><input type="text" id="prodImage"></div>
+                <div class="input-group"><label>صور إضافية (رابط في كل سطر)</label><textarea id="prodGallery" rows="3"></textarea></div>
                 <div class="modal-actions"><button class="btn-cancel" onclick="closeModal('productModal')">إلغاء</button><button class="btn-save" onclick="saveProduct()">حفظ</button></div>
             </div>
         </div>
@@ -1384,7 +1388,7 @@
 
             <div style="display: flex; border-bottom: 3px solid black; padding-bottom: 15px; margin-bottom: 15px;">
                 <div style="flex: 1; border-left: 2px solid black; padding-left: 10px; font-size: 18px;">
-                    <strong>من:</strong> اسم البراند<br>
+                    <strong>من:</strong> مودي ستور<br>
                     <strong>السماح بالفتح:</strong> <span id="printAllowOpen">لا</span>
                 </div>
                 <div style="flex: 1; padding-right: 10px; display: flex; justify-content: center; align-items: center;" id="qrCodeBox"></div>
