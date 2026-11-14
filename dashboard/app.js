@@ -2209,7 +2209,7 @@ window.saveVoucher = () => {
     const value = document.getElementById("voucherValue").value;
     const limit = document.getElementById("voucherLimit").value; 
     
-    if (!code || !value) return;
+    if (!code || (!value && type !== 'shipping')) return;
     
     let data = { 
         code: code, 
@@ -2384,7 +2384,7 @@ onValue(ref(db, 'vouchers'), (snapshot) => {
         }
         window.filterVouchers();
         const lk = {};
-        allVouchers.forEach(v => { const c = String(v.code || '').toUpperCase().replace(/[.#$\[\]\/]/g, ''); if (c && v.isActive !== false) lk[c] = { code: c, type: v.type || '', value: Number(v.value) || 0, isActive: true, id: v.id }; });
+        allVouchers.forEach(v => { const c = String(v.code || '').toUpperCase().replace(/[.#$\[\]\/]/g, ''); if (c && v.isActive !== false && !(Number(v.usageLimit) > 0 && Object.keys(v.users || {}).length >= Number(v.usageLimit))) lk[c] = { code: c, type: v.type || '', value: Number(v.value) || 0, isActive: true, id: v.id }; });
         set(ref(db, 'voucherLookup'), lk).catch(() => {});
     } catch(err) {
         console.error(err);
@@ -2932,7 +2932,7 @@ if (myProfileBtn && myProfileMenu) {
 (() => {
     const MODULES = ['analytics','orders','finance','returns','products','categories','vouchers','shipping','employees','logs','inventory','reviews'];
     const ACTIONS = {
-        analytics:['view','export'], orders:['view','create','changeStatus','details'],
+        analytics:['view','export'], orders:['view','create','changeStatus','details','viewArchive','editDelivered'],
         finance:['view','purchase','expense','history','export'], returns:['view','create','details','archive','export'],
         products:['view','add','edit','toggle','delete'], categories:['view','add','edit','toggle','delete'],
         vouchers:['view','add','edit','toggle','delete','users'], shipping:['view','edit','toggle','delete'],
@@ -3595,7 +3595,7 @@ if (myProfileBtn && myProfileMenu) {
     window.exportOrdersToPDF = () => {
         const rows=selectedOrders().map(o=>`<tr><td>${html(o.displayId||o.orderId||'-')}</td><td>${html(o.customer?.name||'-')}</td><td>${html(o.customer?.phone||'-')}</td><td>${html(o.status||'-')}</td><td>${html(o.paymentMethod||'-')}</td><td>${Math.round(number(o.total))} ج.م</td><td>${html(typeof formatDateTime==='function'?formatDateTime(o.createdAt):'')}</td></tr>`).join('');
         if(!rows)return showAlert('لا توجد طلبات مطابقة للتصدير','warning'); const root=document.getElementById('printRoot'); if(!root)return;
-        root.innerHTML=`<div dir="rtl" style="font-family:Cairo;padding:18px;color:#111"><h1 style="text-align:center">تقرير الطلبات</h1><p>تاريخ الاستخراج: ${new Date().toLocaleString('ar-EG')}</p><table style="width:100%;border-collapse:collapse;text-align:center"><thead><tr>${['رقم الطلب','العميل','الهاتف','الحالة','الدفع','الإجمالي','التاريخ'].map(x=>`<th style="border:1px solid #111;padding:7px">${x}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table></div>`;
+        root.innerHTML=`<div dir="rtl" style="font-family:Cairo;padding:18px;color:#111"><div style="text-align:center">${window.LOGO_SVG||''}<div style="font-weight:900;font-size:22px">مودي ستور</div><div style="letter-spacing:.3em;font-size:11px">MODYSTORE</div></div><h1 style="text-align:center">تقرير الطلبات</h1><p>تاريخ الاستخراج: ${new Date().toLocaleString('ar-EG')}</p><table style="width:100%;border-collapse:collapse;text-align:center"><thead><tr>${['رقم الطلب','العميل','الهاتف','الحالة','الدفع','الإجمالي','التاريخ'].map(x=>`<th style="border:1px solid #111;padding:7px">${x}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table></div>`;
         document.body.classList.add('dashboard-printing'); window.print(); setTimeout(()=>{document.body.classList.remove('dashboard-printing');root.innerHTML='';},700);
     };
     window.exportProfitReport = async () => {
@@ -3647,7 +3647,7 @@ if (myProfileBtn && myProfileMenu) {
         table.innerHTML=list.map(p=>{
             const price=p.discountPrice?`<del style="color:#94a3b8">${p.price}</del> <span style="color:var(--accent);font-weight:bold">${p.discountPrice} ج.م</span>`:`${p.price} ج.م`;
             const stock=num2(p.stock)<=5?`<span style="color:var(--danger);font-weight:bold">${num2(p.stock)} (نواقص)</span>`:num2(p.stock);
-            return `<tr><td><div class="product-info"><img src="${esc2(p.imageUrl||'https://via.placeholder.com/300')}" class="product-img"><span>${esc2(p.name)}</span></div></td><td>${price}</td><td style="font-weight:bold">${stock}</td><td>${esc2(p.category||'-')}</td><td><span class="badge ${p.isActive?'badge-active':'badge-inactive'}">${p.isActive?'معروض':'مخفي'}</span></td><td><div class="actions">${window.hasDashboardPermission('products','edit')?`<button class="btn-action btn-edit" onclick="editProduct('${p.id}')"><i class="fas fa-pen"></i></button>`:''}${window.hasDashboardPermission('products','toggle')?`<button class="btn-action btn-hide" style="background:${p.isActive?'#64748b':'#22c55e'}" onclick="toggleProduct('${p.id}',${!!p.isActive},'${esc2(p.name)}')"><i class="fas ${p.isActive?'fa-eye-slash':'fa-eye'}"></i></button>`:''}${window.hasDashboardPermission('products','delete')?`<button class="btn-action btn-delete" onclick="deleteProduct('${p.id}','${esc2(p.name)}')"><i class="fas fa-trash"></i></button>`:''}</div></td></tr>`;
+            return `<tr><td><div class="product-info"><img src="${esc2(p.imageUrl||'https://via.placeholder.com/300')}" class="product-img"><span>${esc2(p.name)}</span></div></td><td>${price}</td><td>${esc2(p.category||'-')}</td><td><span class="badge ${p.isActive?'badge-active':'badge-inactive'}">${p.isActive?'معروض':'مخفي'}</span></td><td><div class="actions">${window.hasDashboardPermission('products','edit')?`<button class="btn-action btn-edit" onclick="editProduct('${p.id}')"><i class="fas fa-pen"></i></button>`:''}${window.hasDashboardPermission('products','toggle')?`<button class="btn-action btn-hide" style="background:${p.isActive?'#64748b':'#22c55e'}" onclick="toggleProduct('${p.id}',${!!p.isActive},'${esc2(p.name)}')"><i class="fas ${p.isActive?'fa-eye-slash':'fa-eye'}"></i></button>`:''}${window.hasDashboardPermission('products','delete')?`<button class="btn-action btn-delete" onclick="deleteProduct('${p.id}','${esc2(p.name)}')"><i class="fas fa-trash"></i></button>`:''}</div></td></tr>`;
         }).join('');
         setTimeout(()=>{if(typeof window.renderInventoryTable==='function')window.renderInventoryTable();},0);
     };
@@ -4336,6 +4336,9 @@ if (myProfileBtn && myProfileMenu) {
         let stock=Math.max(0,parseInt(document.getElementById('prodStock')?.value,10)||0);
         const category=document.getElementById('prodCategory')?.value||'';
         const description=document.getElementById('prodDesc')?.value||'';
+        let __prodCode=(document.getElementById('prodCode')?.value||'').trim().toUpperCase();
+        if(!__prodCode)__prodCode=window.nextProductCode();
+        if((allProducts||[]).some(p=>p.id!==editingProductId&&String(p.code||'').toUpperCase()===__prodCode))return window.showAlert('هذا الكود مستخدم لمنتج آخر. اختر كودًا مختلفًا.','warning');
         const splitList=(v,max)=>String(v||'').split(/[,،\n]/).map(x=>x.trim()).filter(Boolean).slice(0,max);
         const sizes=splitList(document.getElementById('prodSizes')?.value,12), colors=splitList(document.getElementById('prodColors')?.value,12);
         const gallery=String(document.getElementById('prodGallery')?.value||'').split('\n').map(x=>x.trim()).filter(x=>/^https:\/\//.test(x)).slice(0,6);
@@ -4349,7 +4352,7 @@ if (myProfileBtn && myProfileMenu) {
 
         const data=cleanData({
             name, price, discountPrice:discount && discount>0 ? discount : null, stock, category,
-            description, sizes, colors, gallery, variantStock: vsMap||null, imageUrl:image||'https://via.placeholder.com/300',
+            description, sizes, colors, gallery, code: __prodCode, variantStock: vsMap||null, imageUrl:image||'https://via.placeholder.com/300',
             createdAt:Date.now()
         });
 
@@ -5198,7 +5201,7 @@ if (myProfileBtn && myProfileMenu) {
         syncPaymentToggle('setPayWallet','setWalletEnabled');
         syncPaymentToggle('setPayInstapay','setInstapayEnabled');
     };
-    window.setPaymentConfirmation = async (orderId, status) => {
+    window.setPaymentConfirmation = async (orderId, status) => { { const __o=(typeof allOrders!=='undefined'?allOrders:[]).find(x=>x.dbId===orderId); if(__o&&['ملغي','مرتجع'].includes(__o.status))return window.showAlert?.('لا يمكن تأكيد الدفع لطلب ملغي أو مرتجع.','error'); }
         if (window.currentUserRole && window.currentUserRole !== 'Admin') return window.showAlert?.('تأكيد الدفع متاح للمدير فقط.','error');
         const order = (window.allOrders || []).find?.(o => o.dbId === orderId);
         const patch = { paymentConfirmation: { status, source: 'dashboard', confirmedAt: Date.now(), confirmedBy: window.currentUser?.email || 'Admin' } };
@@ -5416,3 +5419,162 @@ window.exportReportToExcel=()=>{
   XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(R.lines.map(l=>({'التاريخ':l.date,'رقم الطلب':l.id,'المنتج':l.name,'المقاس':l.size,'اللون':l.color,'الكمية':l.qty,'سعر القطعة':Math.round(l.unit),'قبل الخصم':Math.round(l.gross),'خصم العروض':Math.round(l.offer),'خصم الكوبون':Math.round(l.coupon),'الصافي':Math.round(l.net)}))),'القطع');
   XLSX.writeFile(wb,`تقرير_المبيعات_${new Date().toISOString().slice(0,10)}.xlsx`);
 };
+
+
+// ===================== دورة الأوردر الجديدة (تأكيد ← تجهيز ← فاتورة ← شحن ← استلام/استرجاع) =====================
+const opN=v=>Number(v)||0, opM=v=>`${Math.round(opN(v))} ج.م`;
+const opCan=a=>typeof window.hasDashboardPermission==='function'?window.hasDashboardPermission('orders',a):true;
+const opFind=id=>allOrders.find(o=>o.dbId===id);
+const opLabel=o=>o.displayId||o.orderId||o.dbId;
+const opWho=()=>currentUser||'مدير';
+const opMsg=(t,type='success')=>window.showAlert?.(t,type);
+function opShow(html){let m=document.getElementById('opModal');if(!m){m=document.createElement('div');m.className='modal-overlay';m.id='opModal';m.innerHTML='<div class="modal" id="opModalBox" style="max-width:660px;max-height:90vh;overflow:auto"></div>';document.body.appendChild(m);}document.getElementById('opModalBox').innerHTML=html;m.style.display='flex';}
+window.opClose=()=>{const m=document.getElementById('opModal');if(m)m.style.display='none';};
+const opStage=o=>o.status==='قيد المراجعة'?{t:'بانتظار التأكيد',c:'badge-inactive'}:o.status==='جاري التجهيز'?(o.prep&&o.prep.done?{t:'تم التجهيز',c:'badge-active'}:{t:'مؤكد — بانتظار التجهيز',c:'badge-active'}):o.status==='تم الشحن'?{t:'مع شركة الشحن',c:'badge-active'}:{t:o.status,c:o.status==='تم تسليمه'?'badge-active':'badge-inactive'};
+window.switchOrderTab=tab=>{
+  if(tab==='archived'&&!opCan('viewArchive')){opMsg('ليس لديك صلاحية عرض أرشيف الطلبات.','error');return;}
+  currentOrderTab=tab;[['tabActiveOrders','active'],['tabReceiptOrders','receipt'],['tabArchivedOrders','archived']].forEach(([i,t])=>document.getElementById(i)?.classList.toggle('active',tab===t));
+  const sf=document.getElementById('filterOrderStatus');if(sf)sf.value='';window.renderOrdersTable();};
+window.renderOrdersTable=()=>{
+  const table=document.getElementById('ordersTableBody');if(!table)return;
+  const ta=document.getElementById('tabArchivedOrders');if(ta)ta.style.display=opCan('viewArchive')?'':'none';
+  if(!opCan('view')){table.innerHTML='<tr><td colspan="7" style="text-align:center;padding:25px">لا تملك صلاحية عرض الطلبات.</td></tr>';return;}
+  if(currentOrderTab==='archived'&&!opCan('viewArchive'))currentOrderTab='active';
+  const groups={active:['قيد المراجعة','جاري التجهيز'],receipt:['تم الشحن'],archived:['تم تسليمه','ملغي','مرتجع']};
+  const sts=groups[currentOrderTab]||groups.active;
+  const q=(document.getElementById('searchOrders')?.value||'').toLowerCase(),df=document.getElementById('filterOrderDate')?.value||'',pf=document.getElementById('filterOrderPayment')?.value||'',sf=document.getElementById('filterOrderStatus')?.value||'';
+  const list=allOrders.filter(o=>{
+    if(!sts.includes(o.status))return false;
+    if(q&&![o.displayId,o.orderId,o.customer?.name,o.customer?.phone,o.source].some(v=>String(v??'').toLowerCase().includes(q)))return false;
+    if(df){const t=new Date(o.createdAt);if(!Number.isFinite(t.getTime())||t.toISOString().slice(0,10)!==df)return false;}
+    if(pf&&!String(o.paymentMethod||'').includes(pf))return false;
+    if(sf&&o.status!==sf)return false;return true;}).sort((x,y)=>opN(y.createdAt)-opN(x.createdAt));
+  const cnt=document.getElementById('filteredOrdersCount');if(cnt)cnt.innerText=list.length;
+  if(!list.length){table.innerHTML='<tr><td colspan="7" style="text-align:center;padding:25px">لا توجد طلبات في هذا التاب.</td></tr>';return;}
+  const canA=opCan('changeStatus');
+  table.innerHTML=list.map(o=>{const id=__escH(o.dbId),pay=o.payment,stg=opStage(o);
+    const payTxt=pay?`${pay.mode==='split'?`مقدم ${opM(pay.deposit)} / باقي ${opM(pay.remaining)}`:pay.mode==='full'?'مدفوع بالكامل':'تحصيل عند الاستلام'}${pay.ref?' · مرجع '+__escH(pay.ref):''}`:'';
+    let act='';
+    if(canA){
+      if(o.status==='قيد المراجعة')act=`<button class="op-btn op-ok" onclick="opConfirm('${id}')">تأكيد</button><button class="op-btn op-danger" onclick="opCancel('${id}')">إلغاء</button>`;
+      else if(o.status==='جاري التجهيز'&&!(o.prep&&o.prep.done))act=`<button class="op-btn" onclick="opPrep('${id}')">تجهيز الأوردر</button><button class="op-btn op-danger" onclick="opCancel('${id}')">إلغاء</button>`;
+      else if(o.status==='جاري التجهيز')act=`<button class="op-btn op-ghost" onclick="opPrint('${id}')">طباعة الفاتورة</button><button class="op-btn op-ok" ${o.invoicePrinted?'':'disabled title="اطبع الفاتورة أولًا"'} onclick="opHandover('${id}')">تأكيد تسليم الشحنة لشركة الشحن</button>`;
+      else if(o.status==='تم الشحن')act=`<button class="op-btn op-ok" onclick="opReceived('${id}')">تأكيد استلام العميل</button><button class="op-btn op-warn" onclick="opReturn('${id}')">استرجاع المنتج</button>`;
+      else if(o.status==='تم تسليمه'&&opCan('editDelivered'))act=`<button class="op-btn op-warn" onclick="opReturn('${id}')">استرجاع المنتج</button>`;
+    }
+    return `<tr><td style="font-weight:900;color:var(--primary)">#${__escH(opLabel(o))}</td><td><b>${__escH(o.customer?.name||'بدون اسم')}</b><br><span class="meta-info">${__escH(o.paymentMethod||'الدفع عند الاستلام')}</span>${payTxt?`<br><span class="meta-info" style="color:#10b981">${payTxt}</span>`:''}</td><td><span class="source-chip">${__escH(o.source||'الموقع الإلكتروني')}</span></td><td dir="ltr" class="meta-info">${__escH(formatDateTime(o.createdAt))}</td><td style="font-weight:bold;color:var(--secondary)">${opM(o.total)}</td><td><span class="badge ${stg.c}">${__escH(stg.t)}</span></td><td><div class="op-actions"><button class="btn-action btn-view" title="تفاصيل الطلب" onclick="viewOrderDetails('${id}')"><i class="fas fa-eye"></i></button>${act}</div></td></tr>`;}).join('');
+};
+// ---- تأكيد الطلب + الدفع
+window.opConfirm=id=>{const o=opFind(id);if(!o)return;
+  if(!opCan('changeStatus'))return opMsg('ليس لديك صلاحية.','error');
+  if(o.status!=='قيد المراجعة')return opMsg('هذا الطلب تم تأكيده بالفعل أو مغلق.','warning');
+  window.__opId=id;const total=Math.round(opN(o.total)),pm=o.paymentMethod||'';
+  const methods=['الدفع عند الاستلام','محفظة الكترونية','انستا باي','تحويل بنكي','كاش (تم التحصيل)'];
+  const cur=(pm==='كاش'||pm==='الدفع عند الاستلام'||!pm)?'الدفع عند الاستلام':pm;
+  opShow(`<h3 style="margin-top:0">تأكيد الطلب #${__escH(opLabel(o))}</h3><p>العميل: <b>${__escH(o.customer?.name||'')}</b> — الإجمالي: <b>${opM(total)}</b></p>
+   <div class="input-group"><label>نوع الدفع</label><select id="opPayMethod">${methods.map(m=>`<option ${m===cur?'selected':''}>${m}</option>`).join('')}</select></div>
+   <div class="input-group"><label>طريقة السداد</label><select id="opPayMode" onchange="opPayModeChange()"><option value="full">دفع كامل الآن</option><option value="split">دفعتين (مقدم + الباقي عند الاستلام)</option><option value="cod">الكل عند الاستلام</option></select></div>
+   <div class="input-group" id="opDepWrap" style="display:none"><label>المبلغ المقدَّم</label><input type="number" id="opDeposit" min="1" max="${total}" oninput="opPayModeChange()"><small id="opRemain"></small></div>
+   <div class="input-group" id="opRefWrap"><label>الرقم المرجعي للعملية *</label><input type="text" id="opRef" maxlength="60"></div>
+   <div class="input-group"><label>رابط صورة الإيصال (اختياري)</label><input type="text" id="opReceipt" placeholder="https://..."></div>
+   <div style="display:flex;gap:10px"><button class="op-btn op-ok" onclick="opConfirmSave('${__escH(id)}')">تأكيد الطلب</button><button class="op-btn op-ghost" onclick="opClose()">إلغاء</button></div>`);
+  document.getElementById('opPayMode').value=(cur==='الدفع عند الاستلام')?'cod':'full';window.opPayModeChange();};
+window.opPayModeChange=()=>{const mode=document.getElementById('opPayMode')?.value,o=opFind(window.__opId);
+  const dw=document.getElementById('opDepWrap'),rw=document.getElementById('opRefWrap');if(dw)dw.style.display=mode==='split'?'':'none';if(rw)rw.style.display=mode==='cod'?'none':'';
+  const total=Math.round(opN(o?.total)),v=opN(document.getElementById('opDeposit')?.value),r=document.getElementById('opRemain');if(r)r.textContent=(mode==='split'&&v>0)?`الباقي عند الاستلام: ${opM(total-v)}`:'';};
+window.opConfirmSave=async id=>{const o=opFind(id);if(!o)return;
+  const total=Math.round(opN(o.total)),method=document.getElementById('opPayMethod').value,mode=document.getElementById('opPayMode').value;
+  const dep=opN(document.getElementById('opDeposit')?.value),refNo=(document.getElementById('opRef')?.value||'').trim(),rc=(document.getElementById('opReceipt')?.value||'').trim();
+  if(mode!=='cod'&&!refNo)return opMsg('اكتب الرقم المرجعي للعملية.','warning');
+  if(mode==='split'&&(dep<=0||dep>=total))return opMsg('المقدَّم لازم يكون أكبر من صفر وأقل من الإجمالي.','warning');
+  if(rc&&!/^https:\/\//i.test(rc))return opMsg('رابط الإيصال لازم يبدأ بـ https://','warning');
+  const paid=mode==='full'?total:mode==='split'?dep:0,now=Date.now();
+  const payment={method,mode,total,paid,deposit:mode==='split'?dep:0,remaining:total-paid,ref:mode==='cod'?'':refNo,receiptUrl:rc,confirmedAt:now,confirmedBy:opWho()};
+  try{await update(ref(db,'orders/'+id),{status:'جاري التجهيز',processedAt:now,confirmedAt:now,confirmedBy:opWho(),payment,paymentConfirmation:paid>0?{status:'confirmed',source:'dashboard',confirmedAt:now,confirmedBy:opWho()}:null});
+    logAction('تأكيد طلب',`تأكيد الطلب #${opLabel(o)} — ${method} — ${mode==='full'?'دفع كامل':mode==='split'?'مقدم '+dep+' ج.م':'عند الاستلام'}${refNo?' — مرجع '+refNo:''}`);
+    opClose();opMsg('تم تأكيد الطلب.');}catch(e){console.error(e);opMsg('تعذر حفظ التأكيد.','error');}};
+// ---- التجهيز (سكانر / كود / كمية يدوية)
+window.opPrep=id=>{const o=opFind(id);if(!o)return;if(!opCan('changeStatus'))return opMsg('ليس لديك صلاحية.','error');
+  window.__prepId=id;window.__prepScan=Object.assign({},o.prep?.scanned||{});
+  opShow(`<h3 style="margin-top:0">تجهيز الأوردر #${__escH(opLabel(o))}</h3>
+   <div class="input-group"><label>امسح الباركود أو اكتب كود المنتج ثم Enter</label><input type="text" id="opScanInput" autocomplete="off" onkeydown="if(event.key==='Enter'){opScanCode(this.value);this.value='';event.preventDefault();}"></div>
+   <div id="opScanMsg"></div><div id="opPrepBody"></div>
+   <div style="display:flex;gap:10px;margin-top:10px"><button class="op-btn op-ok" id="opPrepDone" disabled onclick="opPrepFinish()">تم التجهيز</button><button class="op-btn op-ghost" onclick="opClose()">حفظ والخروج</button></div>`);
+  opRenderPrep();setTimeout(()=>document.getElementById('opScanInput')?.focus(),50);};
+function opRenderPrep(){const o=opFind(window.__prepId);if(!o)return;const items=Object.values(o.items||{}),sc=window.__prepScan;let all=true;
+  document.getElementById('opPrepBody').innerHTML=items.map((it,i)=>{const need=opN(it.qty),have=opN(sc[i]),ok=have>=need;if(!ok)all=false;const p=allProducts.find(x=>x.id===it.id);
+    return `<div class="op-line ${ok?'ok':''}"><div><b>${__escH(it.name)}</b><br><small>كود: ${__escH(p?.code||'—')}</small></div><div class="op-qty"><button class="op-btn op-ghost" onclick="opScanAdj(${i},-1)">−</button><input type="number" min="0" max="${need}" value="${have}" onchange="opScanSet(${i},this.value)"><span>/ ${need}</span><button class="op-btn op-ghost" onclick="opScanAdj(${i},1)">+</button></div></div>`;}).join('');
+  const b=document.getElementById('opPrepDone');if(b)b.disabled=!all;}
+async function opScanSave(){try{await update(ref(db,'orders/'+window.__prepId+'/prep'),{scanned:window.__prepScan});}catch(e){console.error(e);}}
+window.opScanSet=(i,v)=>{const o=opFind(window.__prepId),it=Object.values(o.items||{})[i];window.__prepScan[i]=Math.max(0,Math.min(opN(it.qty),parseInt(v,10)||0));opRenderPrep();opScanSave();};
+window.opScanAdj=(i,d)=>window.opScanSet(i,opN(window.__prepScan[i])+d);
+window.opScanCode=code=>{const c=String(code||'').trim().toUpperCase(),msg=document.getElementById('opScanMsg');if(!c)return;
+  const o=opFind(window.__prepId),items=Object.values(o.items||{}),p=allProducts.find(x=>String(x.code||'').toUpperCase()===c);
+  const say=(t,ok)=>{if(msg){msg.textContent=t;msg.style.color=ok?'#10b981':'#ef4444';}};
+  if(!p)return say('الكود غير موجود: '+c,false);
+  const idx=items.findIndex((it,i)=>it.id===p.id&&opN(window.__prepScan[i])<opN(it.qty));
+  if(idx<0)return say('المنتج ده مش في الطلب أو كميته اكتملت.',false);
+  window.__prepScan[idx]=opN(window.__prepScan[idx])+1;say('تمت إضافة: '+items[idx].name,true);opRenderPrep();opScanSave();};
+window.opPrepFinish=async()=>{const id=window.__prepId,o=opFind(id);if(!o)return;
+  try{await update(ref(db,'orders/'+id),{prep:{done:true,doneAt:Date.now(),doneBy:opWho(),scanned:window.__prepScan}});
+    logAction('تجهيز طلب',`تم تجهيز الطلب #${opLabel(o)}`);opClose();opMsg('تم التجهيز. اطبع الفاتورة الآن.');}catch(e){console.error(e);opMsg('تعذر الحفظ.','error');}};
+// ---- طباعة الفاتورة
+window.opPrint=id=>{const o=opFind(id);if(!o)return;window.viewOrderDetails(id);
+  setTimeout(async()=>{try{closeModal('orderDetailsModal');}catch(e){}const c=document.getElementById('invoicePrintContainer');if(!c)return;
+    window.printNode(c);try{await update(ref(db,'orders/'+id),{invoicePrinted:true,invoicePrintedAt:Date.now()});}catch(e){}
+    logAction('طباعة فاتورة',`طباعة فاتورة الطلب #${opLabel(o)}`);},300);};
+// ---- تسليم الشحنة لشركة الشحن
+window.opHandover=async id=>{const o=opFind(id);if(!o)return;if(!o.invoicePrinted)return opMsg('اطبع الفاتورة أولًا.','warning');
+  const names=[];try{const s=await get(ref(db,'shippingCompanies'));s.forEach(c=>{const v=c.val();if(v&&v.isActive!==false&&v.name)names.push(v.name);});}catch(e){}
+  opShow(`<h3 style="margin-top:0">تسليم الشحنة #${__escH(opLabel(o))}</h3>
+   <div class="input-group"><label>شركة الشحن</label><select id="opCompany"><option value="">— تسليم يدوي / بدون —</option>${names.map(n=>`<option>${__escH(n)}</option>`).join('')}</select></div>
+   <div class="input-group"><label>رقم الشحنة (اختياري)</label><input type="text" id="opTracking" maxlength="60"></div>
+   <div style="display:flex;gap:10px"><button class="op-btn op-ok" onclick="opHandoverSave('${__escH(id)}')">تأكيد التسليم لشركة الشحن</button><button class="op-btn op-ghost" onclick="opClose()">إلغاء</button></div>`);};
+window.opHandoverSave=async id=>{const o=opFind(id);if(!o)return;const company=document.getElementById('opCompany').value,tracking=(document.getElementById('opTracking').value||'').trim(),now=Date.now();
+  try{await update(ref(db,'orders/'+id),{status:'تم الشحن',shippedAt:now,shipment:{company,tracking,handedBy:opWho(),at:now}});
+    logAction('تسليم شحنة',`تسليم الطلب #${opLabel(o)} لشركة الشحن${company?' ('+company+')':''}${tracking?' — '+tracking:''}`);opClose();opMsg('تم. الطلب انتقل لتاب تأكيد الاستلام.');}catch(e){console.error(e);opMsg('تعذر الحفظ.','error');}};
+// ---- استلام العميل / استرجاع
+window.opReceived=id=>{const o=opFind(id);if(!o)return;
+  window.showConfirm(`تأكيد أن العميل ${o.customer?.name||''} استلم الطلب #${opLabel(o)}؟`,async()=>{const now=Date.now();
+    const patch={status:'تم تسليمه',deliveredAt:now,customerReceived:true,receivedBy:opWho()};
+    if(o.payment){patch['payment/collectedAt']=now;if(opN(o.payment.remaining)>0)patch['payment/remainingCollected']=true;}
+    if(!(o.paymentConfirmation&&o.paymentConfirmation.status==='confirmed'))patch.paymentConfirmation={status:'confirmed',source:'delivery',confirmedAt:now,confirmedBy:opWho()};
+    try{await update(ref(db,'orders/'+id),patch);logAction('تأكيد استلام عميل',`العميل استلم الطلب #${opLabel(o)}`);opMsg('تم تأكيد الاستلام.');}catch(e){console.error(e);opMsg('تعذر الحفظ.','error');}});};
+window.opReturn=id=>{const o=opFind(id);if(!o)return;
+  opShow(`<h3 style="margin-top:0">استرجاع منتجات الطلب #${__escH(opLabel(o))}</h3>
+   <div class="input-group"><label>سبب الاسترجاع *</label><textarea id="opReason" rows="3"></textarea></div>
+   <label style="display:flex;gap:8px;align-items:center;margin:8px 0"><input type="checkbox" id="opRestore" checked style="width:auto"> إرجاع الكميات للمخزون</label>
+   <div style="display:flex;gap:10px"><button class="op-btn op-warn" onclick="opReturnSave('${__escH(id)}')">تأكيد الاسترجاع</button><button class="op-btn op-ghost" onclick="opClose()">رجوع</button></div>`);};
+window.opReturnSave=async id=>{const o=opFind(id);if(!o)return;const reason=(document.getElementById('opReason').value||'').trim(),restore=document.getElementById('opRestore').checked;
+  if(!reason)return opMsg('اكتب سبب الاسترجاع.','warning');const now=Date.now();
+  try{await update(ref(db,'orders/'+id),{status:'مرتجع',returnedAt:now,returnInfo:{reason,at:now,by:opWho(),stockRestored:restore}});
+    if(restore&&o.stockDeducted===true&&o.stockRestored!==true)await window.restoreStockForOrder(id,{...o,status:'مرتجع'});
+    logAction('استرجاع منتج',`استرجاع الطلب #${opLabel(o)} — السبب: ${reason}${restore?' — رجع للمخزون':''}`);opClose();opMsg('تم الاسترجاع.');}catch(e){console.error(e);opMsg('تعذر الاسترجاع.','error');}};
+// ---- إلغاء قبل الشحن
+window.opCancel=id=>{const o=opFind(id);if(!o)return;
+  opShow(`<h3 style="margin-top:0">إلغاء الطلب #${__escH(opLabel(o))}</h3><div class="input-group"><label>سبب الإلغاء *</label><textarea id="opReason" rows="3"></textarea></div>
+   <div style="display:flex;gap:10px"><button class="op-btn op-danger" onclick="opCancelSave('${__escH(id)}')">تأكيد الإلغاء</button><button class="op-btn op-ghost" onclick="opClose()">رجوع</button></div>`);};
+window.opCancelSave=async id=>{const o=opFind(id);if(!o)return;const reason=(document.getElementById('opReason').value||'').trim();if(!reason)return opMsg('اكتب سبب الإلغاء.','warning');
+  try{await cancelOrderAndRestoreStock(id,opLabel(o),reason);logAction('إلغاء طلب',`إلغاء الطلب #${opLabel(o)} — السبب: ${reason}`);opClose();opMsg('تم إلغاء الطلب.');}catch(e){console.error(e);opMsg(e.message||'تعذر الإلغاء','error');}};
+
+// ===================== كود المنتج + تنظيف نموذج المنتج =====================
+window.nextProductCode=()=>{let max=0;(allProducts||[]).forEach(p=>{const m=/^M(\d{4})$/i.exec(String(p.code||''));if(m)max=Math.max(max,Number(m[1]));});return 'M'+String(max+1).padStart(4,'0');};
+window.genProductCode=()=>{const e=document.getElementById('prodCode');if(e)e.value=window.nextProductCode();};
+window.resetProductForm=()=>{['prodName','prodPrice','prodDiscountPrice','prodOfferDays','prodDesc','prodImage','prodGallery','prodSizes','prodColors','prodCode','prodAddStockOnly'].forEach(i=>{const e=document.getElementById(i);if(e)e.value='';});
+  const st=document.getElementById('prodStock');if(st)st.value='0';window.__vs={};window.loadStoreOptions().then(()=>window.renderOptionPickers());};
+{const prevOpen=window.openProductModal;window.openProductModal=()=>{prevOpen?.();const m=document.getElementById('productModal');if(!m||m.style.display==='none'||m.style.display==='')return;editingProductId=null;window.resetProductForm();};}
+{const prevEdit=window.editProduct;window.editProduct=id=>{prevEdit?.(id);const p=(allProducts||[]).find(x=>x.id===id);if(!p)return;const set=(i,v)=>{const e=document.getElementById(i);if(e)e.value=v;};
+  set('prodCode',p.code||'');set('prodSizes',Object.values(p.sizes||{}).join(','));set('prodColors',Object.values(p.colors||{}).join(','));set('prodGallery',Object.values(p.gallery||{}).join('\n'));window.loadStoreOptions().then(()=>window.renderOptionPickers());};}
+{const prevClose=window.closeModal;window.closeModal=id=>{prevClose?.(id);if(id==='productModal'){editingProductId=null;window.resetProductForm();}};}
+{const prevSave=window.saveProduct;window.saveProduct=async(...a)=>{const r=await prevSave?.(...a);setTimeout(()=>{window.filterProducts?.();},400);return r;};}
+{const pv=document.getElementById('products-view');if(pv)new MutationObserver(()=>{const m=document.getElementById('productModal');if(pv.offsetParent!==null&&(!m||m.style.display!=='flex')){window.filterProducts?.();window.resetProductForm();}}).observe(pv,{attributes:true,attributeFilter:['class','style']});}
+// أكواد تلقائية للمنتجات القديمة (مرة واحدة للمدير)
+(async()=>{for(let i=0;i<20&&window.currentUserRole!=='Admin';i++)await new Promise(r=>setTimeout(r,1500));if(window.currentUserRole!=='Admin')return;await new Promise(r=>setTimeout(r,3000));
+  try{const s=await get(ref(db,'products'));let max=0;const missing=[];s.forEach(c=>{const p=c.val()||{};const m=/^M(\d{4})$/i.exec(String(p.code||''));if(m)max=Math.max(max,Number(m[1]));if(!p.code)missing.push(c.key);});
+    if(!missing.length)return;const up={};missing.forEach(k=>{max++;up[k+'/code']='M'+String(max).padStart(4,'0');});await update(ref(db,'products'),up);window.showAlert?.(`تم توليد كود لـ ${missing.length} منتج.`,'success');}catch(e){console.error(e);}})();
+
+// ===================== دمج طرق الدفع في كارت واحد =====================
+{const merge=()=>{const grid=document.querySelector('.payment-settings-grid');const h3=[...document.querySelectorAll('.settings-card-head h3')].find(x=>x.textContent.includes('الدفع اليدوي'));
+  if(!grid||!h3)return false;const manual=h3.closest('.settings-card-head').parentElement,card=grid.parentElement;if(manual===card||manual.dataset.merged)return true;
+  const head=manual.querySelector('.settings-card-head');[...manual.children].forEach(ch=>{if(ch!==head)card.appendChild(ch);});manual.style.display='none';manual.dataset.merged='1';return true;};
+  const t=setInterval(()=>{if(merge())clearInterval(t);},700);setTimeout(()=>clearInterval(t),20000);}
