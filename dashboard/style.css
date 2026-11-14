@@ -1045,3 +1045,14 @@ body.dark-mode{--panel-white:#111827;--panel-soft:#172236;--muted-text:#94a3b8}
 .se-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;margin:12px 0}.se-grid div{display:flex;flex-direction:column;gap:4px}.se-grid small{color:var(--muted-text)}
 
 @media print{#invoicePrintContainer,#invoicePrintContainer *{background:#fff!important;color:#000!important}}
+
+.manual-add-item-row{display:flex!important;flex-wrap:wrap;gap:8px}.manual-add-item-row select,.manual-add-item-row input{flex:1 1 130px;min-width:0}
+
+body.dark-mode .settings-status-card{background:#172236;border-color:#263449;box-shadow:none}
+body.dark-mode .settings-status-card,body.dark-mode .settings-status-card strong,body.dark-mode .settings-status-card span{color:#e2e8f0}
+body.dark-mode .settings-status-card small{color:#94a3b8}
+.payment-confirm-btn{background:#2563eb!important;color:#fff!important;border:0!important;padding:6px 12px;border-radius:8px;cursor:pointer;font-family:inherit;font-weight:700}
+#reportDiscountBox{display:none!important}
+.rpt-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:12px}.rpt-grid div{background:var(--panel-soft);border:1px solid var(--border);border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:2px}
+.rpt-grid small{color:var(--muted-text);font-size:11px;font-weight:700}.rpt-grid b{font-size:16px;color:var(--text-dark)}.rpt-grid .wide{grid-column:1/-1}.rpt-grid .good b{color:#10b981}.rpt-grid .bad b{color:#ef4444}
+.manual-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0}.manual-summary div{background:var(--panel-soft);border:1px solid var(--border);border-radius:10px;padding:8px 10px;display:flex;flex-direction:column}.manual-summary small{color:var(--muted-text);font-size:11px}
