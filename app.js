@@ -251,10 +251,13 @@ async function createFirebaseOrder(payload) {
     let discount = 0;
     let voucher = null;
     if (appliedVoucher) {
-        discount = appliedVoucher.type === 'percentage'
-            ? subtotal * ((Number(appliedVoucher.value) || 0) / 100)
-            : Number(appliedVoucher.value) || 0;
-        discount = Math.min(Math.max(discount, 0), subtotal);
+        if (appliedVoucher.type === 'shipping') discount = shippingCost;
+        else {
+            discount = appliedVoucher.type === 'percentage'
+                ? subtotal * ((Number(appliedVoucher.value) || 0) / 100)
+                : Number(appliedVoucher.value) || 0;
+            discount = Math.min(Math.max(discount, 0), subtotal);
+        }
         voucher = { id: appliedVoucher.id || null, code: appliedVoucher.code || '' };
     }
 
@@ -281,7 +284,10 @@ async function createFirebaseOrder(payload) {
 
     // Realtime Database multi-location updates are atomic: either the order
     // and all stock changes succeed together, or none of them are applied.
-    await update(ref(db), { ...productUpdates, [`orders/${orderId}`]: order });
+    const __pk = String(payload.customer.phone || '').replace(/\D/g, '');
+    const __usage = (voucher && voucher.id && __pk) ? { [`vouchers/${voucher.id}/users/${__pk}`]: { orderId, at: Date.now() } } : {};
+    try { await update(ref(db), { ...productUpdates, ...__usage, [`orders/${orderId}`]: order }); }
+    catch (err) { if (voucher) throw new Error('تعذّر تطبيق كود الخصم (ربما استُخدم من قبل على هذا الرقم). أزل الكود وأعد المحاولة.'); throw err; }
     return {
         ok: true,
         orderId,
@@ -640,8 +646,18 @@ window.openProductDetails = (id) => {
     let gd = document.getElementById('modalGallery');
     if (!gd) { gd = document.createElement('div'); gd.id = 'modalGallery'; gd.className = 'opt-gallery'; mainImg.insertAdjacentElement('afterend', gd); }
     const imgs = [p.imageUrl, ...Object.values(p.gallery || {})].filter(Boolean);
-    gd.innerHTML = imgs.length > 1 ? imgs.map(u => `<img src="${escapeHtml(u)}" class="opt-thumb" alt="">`).join('') : '';
-    gd.onclick = e => { if (e.target.tagName === 'IMG') mainImg.src = e.target.src; };
+    let gi = 0;
+    const showImg = i => { if (!imgs.length) return; gi = (i + imgs.length) % imgs.length; mainImg.src = imgs[gi]; gd.querySelectorAll('.opt-thumb').forEach((t, k) => t.classList.toggle('sel', k === gi)); };
+    gd.innerHTML = imgs.length > 1 ? imgs.map((u, k) => `<img src="${escapeHtml(u)}" data-i="${k}" class="opt-thumb${k === 0 ? ' sel' : ''}" alt="">`).join('') : '';
+    gd.onclick = e => { const t = e.target.closest('.opt-thumb'); if (t) showImg(Number(t.dataset.i)); };
+    const gbox = mainImg.parentElement;
+    gbox.querySelectorAll('.g-nav').forEach(x => x.remove());
+    gbox.ontouchstart = gbox.ontouchend = null;
+    if (imgs.length > 1) {
+        [['prev', '›', -1], ['next', '‹', 1]].forEach(([k, t, s]) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'g-nav g-' + k; b.textContent = t; b.setAttribute('aria-label', k === 'prev' ? 'السابقة' : 'التالية'); b.onclick = ev => { ev.stopPropagation(); showImg(gi + s); }; gbox.appendChild(b); });
+        let sx = null; gbox.ontouchstart = ev => { sx = ev.touches[0].clientX; };
+        gbox.ontouchend = ev => { if (sx === null) return; const dx = ev.changedTouches[0].clientX - sx; sx = null; if (Math.abs(dx) > 40) showImg(gi + (dx < 0 ? 1 : -1)); };
+    }
     if (Number(p.stock || 0) <= 0) {
         btnContainer.innerHTML = `<button class="modal-add-btn out-of-stock" disabled>نفذ المخزون <i class="fas fa-ban"></i></button>`;
     } else {
@@ -818,9 +834,12 @@ function calculateFinalTotal(subtotal) {
     const discountRow = document.getElementById("discountRow");
 
     if (appliedVoucher && subtotal > 0) {
-        if (appliedVoucher.type === "percentage") discount = subtotal * (appliedVoucher.value / 100);
-        else discount = appliedVoucher.value;
-        if(discount > subtotal) discount = subtotal;
+        if (appliedVoucher.type === "shipping") discount = Number(currentShippingCost || 0);
+        else {
+            if (appliedVoucher.type === "percentage") discount = subtotal * (appliedVoucher.value / 100);
+            else discount = appliedVoucher.value;
+            if(discount > subtotal) discount = subtotal;
+        }
 
         document.getElementById("discountValue").innerText = `-${Math.round(discount)} ج.م`;
         discountRow.style.display = "flex";
@@ -847,10 +866,13 @@ function getCurrentOrderSummary() {
     const subtotal = cart.reduce((sum, item) => sum + (Number(item.price || 0) * Number(item.qty || 0)), 0);
     let discount = 0;
     if (appliedVoucher && subtotal > 0) {
-        discount = appliedVoucher.type === 'percentage'
-            ? subtotal * (Number(appliedVoucher.value || 0) / 100)
-            : Number(appliedVoucher.value || 0);
-        discount = Math.min(Math.max(discount, 0), subtotal);
+        if (appliedVoucher.type === 'shipping') discount = Number(currentShippingCost || 0);
+        else {
+            discount = appliedVoucher.type === 'percentage'
+                ? subtotal * (Number(appliedVoucher.value || 0) / 100)
+                : Number(appliedVoucher.value || 0);
+            discount = Math.min(Math.max(discount, 0), subtotal);
+        }
     }
     return {
         subtotal,
@@ -1158,7 +1180,14 @@ window.trackOrder = () => {
             const orderDate = new Date(foundOrder.createdAt).toLocaleDateString('ar-EG');
             let discountHtml = foundOrder.discount > 0 ? `<div style="color:var(--accent); display:flex; justify-content:space-between; margin-bottom:5px;"><span>الخصم:</span> <span>-${Math.round(foundOrder.discount)} ج.م</span></div>` : "";
             let shippingHtml = `<div style="display:flex; justify-content:space-between; margin-bottom:5px; color:var(--text-light);"><span>الشحن:</span> <span>${foundOrder.shippingCost || 0} ج.م</span></div>`;
-            const confirmation = foundOrder.customerConfirmation?.status;
+            const __pay = foundOrder.payment; let payInfoHtml = '';
+        if (__pay) { const __row = (k, v) => `<div style="display:flex; justify-content:space-between; margin-bottom:5px; color:var(--text-light);"><span>${k}</span> <span>${v}</span></div>`;
+            payInfoHtml = __row('طريقة الدفع:', escapeHtml(__pay.method || ''));
+            if (__pay.mode === 'split') payInfoHtml += __row('المقدّم المدفوع:', Math.round(__pay.deposit || 0) + ' ج.م') + __row('المتبقي عند الاستلام:', Math.round(__pay.remaining || 0) + ' ج.م');
+            else if (__pay.mode === 'full') payInfoHtml += __row('حالة الدفع:', 'تم السداد بالكامل');
+            else payInfoHtml += __row('حالة الدفع:', 'الدفع عند الاستلام');
+            if (__pay.ref) payInfoHtml += __row('الرقم المرجعي:', escapeHtml(__pay.ref)); }
+        const confirmation = foundOrder.customerConfirmation?.status;
             const confirmationHtml = confirmation === 'confirmed'
                 ? '<div style="color:var(--success);font-weight:800;margin:8px 0;"><i class="fas fa-circle-check"></i> تم تأكيد الطلب من العميل</div>'
                 : confirmation === 'cancelled'
@@ -1169,8 +1198,8 @@ window.trackOrder = () => {
             if (foundOrder.status === 'قيد المراجعة') {
                 actionsHtml = `
                     <div style="display: flex; gap: 10px; margin-top: 20px; padding-top: 15px; border-top: 2px dashed var(--border);">
-                        <button onclick="editCustomerOrder('${foundDbId}')" style="flex:1; background:var(--secondary); color:white; border:none; padding:12px; border-radius:8px; cursor:pointer; font-family:'Cairo'; font-weight:bold; font-size:15px; transition:0.3s;">تعديل الطلب <i class="fas fa-edit"></i></button>
-                        <button onclick="cancelCustomerOrder('${foundDbId}')" style="flex:1; background:var(--accent); color:white; border:none; padding:12px; border-radius:8px; cursor:pointer; font-family:'Cairo'; font-weight:bold; font-size:15px; transition:0.3s;">إلغاء الطلب <i class="fas fa-times"></i></button>
+                        <button onclick="editCustomerOrder('${foundDbId}')" style="flex:1; background:var(--secondary); color:white; border:none; padding:12px; border-radius:8px; cursor:pointer; font-family:'IBM Plex Sans Arabic'; font-weight:bold; font-size:15px; transition:0.3s;">تعديل الطلب <i class="fas fa-edit"></i></button>
+                        <button onclick="cancelCustomerOrder('${foundDbId}')" style="flex:1; background:var(--accent); color:white; border:none; padding:12px; border-radius:8px; cursor:pointer; font-family:'IBM Plex Sans Arabic'; font-weight:bold; font-size:15px; transition:0.3s;">إلغاء الطلب <i class="fas fa-times"></i></button>
                     </div>
                 `;
             }
@@ -1181,7 +1210,7 @@ window.trackOrder = () => {
                 ${confirmationHtml}
                 ${itemsHtml}
                 <div style="display:flex; justify-content:space-between; margin-bottom:5px; color:var(--text-light);"><span>الإجمالي الفرعي:</span> <span>${foundOrder.subtotal} ج.م</span></div>
-                ${shippingHtml}
+                ${shippingHtml}${payInfoHtml}
                 ${discountHtml}
                 <div style="display:flex; justify-content:space-between; margin-top:15px; font-size:18px; font-weight:900; color:var(--title-color); background:var(--gray); padding:10px; border-radius:8px;">
                     <span>الإجمالي النهائي:</span> <span>${Math.round(foundOrder.total)} ج.م</span>
