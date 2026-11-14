@@ -342,7 +342,7 @@
                 
                 <div class="custom-tabs">
                     <button class="custom-tab-btn active" id="tabActiveOrders" onclick="switchOrderTab('active', this)">الطلبات الحالية</button>
-                    <button class="custom-tab-btn" id="tabArchivedOrders" onclick="switchOrderTab('archived', this)">أرشيف الطلبات</button>
+                    <button class="custom-tab-btn" id="tabReceiptOrders" onclick="switchOrderTab('receipt', this)">تأكيد الاستلام</button> <button class="custom-tab-btn" id="tabArchivedOrders" onclick="switchOrderTab('archived', this)">أرشيف الطلبات</button>
                 </div>
 
                 <div class="stat-card" style="margin-bottom: 20px; background: var(--panel-white); padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); display: inline-block;">
@@ -378,7 +378,7 @@
                                 <th>التاريخ</th>
                                 <th>الإجمالي</th>
                                 <th>الحالة</th>
-                                <th>تأكيد العميل</th>
+                                <th>الإجراءات</th>
                             </tr>
                         </thead>
                         <tbody id="ordersTableBody">
@@ -1296,6 +1296,7 @@
                     بناءً على صلاحياتك، يمكنك فقط (زيادة) مخزون هذا المنتج ولن يتم حفظ أي تعديلات أخرى.
                 </div>
                 <div class="input-group"><label>اسم المنتج</label><input type="text" id="prodName"></div>
+<div class="input-group"><label>كود المنتج (اتركه فاضي ليتولد تلقائيًا)</label><div style="display:flex;gap:8px"><input type="text" id="prodCode" maxlength="20" placeholder="مثال: M0001" style="text-transform:uppercase"><button type="button" class="btn-save" style="white-space:nowrap" onclick="genProductCode()">توليد كود</button></div></div>
                 <div class="grid-2">
                     <div class="input-group"><label>السعر الأساسي</label><input type="number" id="prodPrice"></div>
                     <div class="input-group"><label style="color: var(--accent);">سعر العرض (اختياري)</label><input type="number" id="prodDiscountPrice"></div>
@@ -1333,7 +1334,7 @@
         <div class="modal-overlay" id="shippingModal"><div class="modal animate__animated animate__zoomIn"><h3 id="shipModalTitle">إضافة محافظة</h3><div class="input-group"><label>اسم المحافظة / المنطقة</label><input type="text" id="shipGovName"></div><div class="input-group"><label>سعر الشحن (ج.م)</label><input type="number" id="shipPrice"></div><div class="modal-actions"><button class="btn-cancel" onclick="closeModal('shippingModal')">إلغاء</button><button class="btn-save" onclick="saveShipping()">حفظ</button></div></div></div>
         
         <!-- كوبون -->
-        <div class="modal-overlay" id="voucherModal"><div class="modal animate__animated animate__zoomIn"><h3 id="voucherModalTitle">إنشاء كود</h3><div class="grid-2"><div class="input-group"><label>الكود</label><input type="text" id="voucherCode" style="text-transform: uppercase;" pattern="[A-Za-z0-9]+" inputmode="text" autocomplete="off"></div><div class="input-group"><label>القيمة</label><input type="number" id="voucherValue"></div></div><div class="grid-2"><div class="input-group"><label>النوع</label><select id="voucherType"><option value="percentage">نسبة (%)</option><option value="fixed">مبلغ ثابت</option></select></div><div class="input-group"><label>حد الاستخدام</label><input type="number" id="voucherLimit" value="1" min="1"></div></div><div class="modal-actions"><button class="btn-cancel" onclick="closeModal('voucherModal')">إلغاء</button><button class="btn-save" onclick="saveVoucher()">حفظ</button></div></div></div>
+        <div class="modal-overlay" id="voucherModal"><div class="modal animate__animated animate__zoomIn"><h3 id="voucherModalTitle">إنشاء كود</h3><div class="grid-2"><div class="input-group"><label>الكود</label><input type="text" id="voucherCode" style="text-transform: uppercase;" pattern="[A-Za-z0-9]+" inputmode="text" autocomplete="off"></div><div class="input-group"><label>القيمة</label><input type="number" id="voucherValue"></div></div><div class="grid-2"><div class="input-group"><label>النوع</label><select id="voucherType"><option value="percentage">نسبة (%)</option><option value="fixed">مبلغ ثابت</option><option value="shipping">شحن مجاني (يخصم قيمة الشحن)</option></select></div><div class="input-group"><label>حد الاستخدام</label><input type="number" id="voucherLimit" value="1" min="1"></div></div><div class="modal-actions"><button class="btn-cancel" onclick="closeModal('voucherModal')">إلغاء</button><button class="btn-save" onclick="saveVoucher()">حفظ</button></div></div></div>
 
         <!-- عرض مستخدمي الكوبون -->
         <div class="modal-overlay" id="voucherUsersModal">
@@ -1361,7 +1362,7 @@
                     <div class="permission-note">حدد أولاً هل يستطيع رؤية التاب، ثم اختر العمليات المسموح بها داخلها.</div>
                     <div class="permission-grid">
                         <div class="permission-row"><b>الإحصائيات</b><label><input type="checkbox" class="perm-view" data-module="analytics"> عرض</label><label><input type="checkbox" class="perm-export" data-module="analytics"> إصدار التقارير</label></div>
-                        <div class="permission-row"><b>إدارة الطلبات</b><label><input type="checkbox" class="perm-view" data-module="orders"> عرض</label><label><input type="checkbox" data-perm="orders.create"> إنشاء طلب</label><label><input type="checkbox" data-perm="orders.changeStatus"> تغيير الحالة</label><label><input type="checkbox" data-perm="orders.details"> تفاصيل الطلب</label></div>
+                        <div class="permission-row"><b>إدارة الطلبات</b><label><input type="checkbox" class="perm-view" data-module="orders"> عرض</label><label><input type="checkbox" data-perm="orders.create"> إنشاء طلب</label><label><input type="checkbox" data-perm="orders.changeStatus"> تغيير الحالة</label><label><input type="checkbox" data-perm="orders.details"> تفاصيل الطلب</label><label><input type="checkbox" data-perm="orders.viewArchive"> عرض أرشيف الطلبات</label><label><input type="checkbox" data-perm="orders.editDelivered"> استرجاع/تعديل طلب تم تسليمه</label></div>
                         <div class="permission-row"><b>المشتريات والمصروفات</b><label><input type="checkbox" class="perm-view" data-module="finance"> عرض</label><label><input type="checkbox" data-perm="finance.purchase"> إدخال مشتريات</label><label><input type="checkbox" data-perm="finance.expense"> إدخال مصروفات</label><label><input type="checkbox" data-perm="finance.history"> البيانات السابقة</label><label><input type="checkbox" class="perm-export" data-module="finance"> تصدير</label></div>
                         <div class="permission-row"><b>المرتجعات</b><label><input type="checkbox" class="perm-view" data-module="returns"> عرض</label><label><input type="checkbox" data-perm="returns.create"> طلب مرتجع</label><label><input type="checkbox" data-perm="returns.details"> تفاصيل الطلب</label><label><input type="checkbox" data-perm="returns.archive"> أرشفة</label><label><input type="checkbox" class="perm-export" data-module="returns"> تصدير</label></div>
                         <div class="permission-row"><b>المنتجات</b><label><input type="checkbox" class="perm-view" data-module="products"> عرض</label><label><input type="checkbox" data-perm="products.add"> إضافة</label><label><input type="checkbox" data-perm="products.edit"> تعديل</label><label><input type="checkbox" data-perm="products.toggle"> تعطيل/تفعيل</label><label><input type="checkbox" data-perm="products.delete"> حذف</label></div>
