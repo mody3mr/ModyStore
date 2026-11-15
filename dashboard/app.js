@@ -3323,7 +3323,7 @@ if (myProfileBtn && myProfileMenu) {
     }
     const originalOpenManual = window.openManualOrderModal;
     if (originalOpenManual) window.openManualOrderModal = (...args) => { const result=originalOpenManual(...args); setTimeout(populateManualShippingSelect,50); return result; };
-    setInterval(populateManualShippingSelect, 2500);
+    /* تم إيقاف التحديث الدوري: كان بيمسح قائمة المحافظات */
 
     function syncPaymentSwitches() {
         [['setPayWallet','setWalletEnabled'],['setPayInstapay','setInstapayEnabled']].forEach(([mainId,miniId]) => {
@@ -5578,3 +5578,13 @@ window.resetProductForm=()=>{['prodName','prodPrice','prodDiscountPrice','prodOf
   if(!grid||!h3)return false;const manual=h3.closest('.settings-card-head').parentElement,card=grid.parentElement;if(manual===card||manual.dataset.merged)return true;
   const head=manual.querySelector('.settings-card-head');[...manual.children].forEach(ch=>{if(ch!==head)card.appendChild(ch);});manual.style.display='none';manual.dataset.merged='1';return true;};
   const t=setInterval(()=>{if(merge())clearInterval(t);},700);setTimeout(()=>clearInterval(t),20000);}
+
+
+// ===================== تحميل أسعار الشحن في الذاكرة (كان ناقص، وده سبب اختفاء المحافظات) =====================
+onValue(ref(db,'shipping'),snap=>{const rows=[];snap.forEach(c=>{const v=c.val();if(v)rows.push({id:c.key,...v});});allShipping.length=0;rows.forEach(r=>allShipping.push(r));
+  const sel=document.getElementById('manualCustCity');if(sel&&sel.options.length<=1&&rows.length){const cur=sel.value;sel.innerHTML='<option value="">اختر المحافظة...</option>'+rows.filter(x=>x.isActive!==false).map(x=>`<option value="${__escH(x.name)}" data-shipping-price="${Number(x.price||0)}">${__escH(x.name)} (شحن: ${Number(x.price||0)} ج.م)</option>`).join('');if(cur)sel.value=cur;}});
+
+// ===================== كارد زيارات الموقع =====================
+onValue(ref(db,'analytics/sessions'),snap=>{const day=new Date();day.setHours(0,0,0,0);const now=Date.now();let today=0,week=0,total=0;
+  snap.forEach(c=>{const s=c.val()||{};const t=Number(s.firstVisitAt)||Number(s.lastSeenAt)||0;total++;if(t>=day.getTime())today++;if(t>=now-7*86400000)week++;});
+  const a=document.getElementById('statVisitsToday'),b=document.getElementById('statVisitsMeta');if(a)a.innerText=today;if(b)b.innerText=`اليوم · ${week} آخر 7 أيام · ${total} إجمالي`;},()=>{});
