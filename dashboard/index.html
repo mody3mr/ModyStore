@@ -248,7 +248,8 @@
                             <p id="statTotalRevenue">0 ج.م</p>
                         </div>
                     </div>
-                    <div class="stat-card clickable-card" onclick="goToPendingOrders()">
+                    <div class="stat-card"> <div class="stat-icon" style="color:#0ea5e9;background:#e0f2fe;"><i class="fas fa-eye"></i></div> <div class="stat-info"><h3>زيارات الموقع</h3><p id="statVisitsToday">0</p><small id="statVisitsMeta">اليوم · 0 آخر 7 أيام · 0 إجمالي</small></div> </div>
+                <div class="stat-card clickable-card" style="display:none" aria-hidden="true" onclick="goToPendingOrders()">
                         <div class="stat-icon" style="color: #f59e0b; background: #fef3c7;">
                             <i class="fas fa-clock"></i>
                         </div>
@@ -281,7 +282,7 @@
                         <div class="stat-icon" style="color:#0ea5e9;background:#e0f2fe;"><i class="fas fa-receipt"></i></div>
                         <div class="stat-info"><h3>متوسط قيمة الطلب</h3><p id="statAverageOrder">0 ج.م</p><small>من الطلبات غير الملغاة والمرتجعة</small></div>
                     </div>
-                    <div class="stat-card analytics-kpi-card">
+                    <div class="stat-card analytics-kpi-card" style="display:none" aria-hidden="true">
                         <div class="stat-icon" style="color:#f97316;background:#ffedd5;"><i class="fas fa-hourglass-half"></i></div>
                         <div class="stat-info"><h3>قيمة الطلبات قيد المراجعة</h3><p id="statPendingValue">0 ج.م</p><small>إجمالي قابل للتحويل للمبيعات</small></div>
                     </div>
@@ -513,6 +514,7 @@
                             <tr>
                                 <th>المنتج</th>
                                 <th>السعر / العرض</th>
+<th>الكمية الموجودة بالمخزون</th>
                                 <th>القسم</th>
                                 <th>الحالة</th>
                                 <th>الإجراءات</th>
