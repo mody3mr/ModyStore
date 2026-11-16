@@ -1,29 +1,29 @@
 <!DOCTYPE html>
 <html dir="rtl" lang="ar">
-<head>
+<head><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="preconnect" href="https://cdnjs.cloudflare.com"><link rel="preconnect" href="https://cdn.jsdelivr.net"><link rel="preconnect" href="https://www.gstatic.com" crossorigin>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>مودي ستور | ModyStore Dashboard</title>
     <!-- خطوط جوجل والأيقونات -->
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="style.css?v=20260912-3">
+    <link rel="stylesheet" href="style.css?v=20261116">
     <link rel="icon" href="../favicon.svg" type="image/svg+xml"><meta name="robots" content="noindex,nofollow">
     
     <!-- مكتبات التفاعل والأنيميشن -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     
     <!-- مكتبة الرسوم البيانية Chart.js -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <!-- مكتبات الباركود والـ QR Code لبوليصة الشحن والسكانر -->
-    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script defer src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
     
     <!-- مكتبة تصدير الاكسيل -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
     <!-- أكواد الستايل الخاصة بإخفاء أسهم التمرير وتظبيط الطباعة -->
     <style>
@@ -1047,6 +1047,7 @@
                                     <option value="انستا باي">انستا باي</option>
                                 </select>
                             </div>
+<div class="input-group"><label>حالة الدفع</label><select id="manualPayMode"><option value="cod">لم يُدفع (عند الاستلام)</option><option value="full">مدفوع بالكامل</option><option value="split">مدفوع جزئيًا</option></select></div><div class="input-group" id="manualDepWrap" style="display:none"><label>المبلغ المدفوع</label><input type="number" id="manualDeposit" min="1"></div>
                         </div>
                         <div class="input-group"><label>ملاحظات</label><textarea id="manualOrderNotes" rows="3" placeholder="ملاحظات للعميل أو المندوب..."></textarea></div>
                     </div>
@@ -1184,7 +1185,7 @@
                 <div style="background: var(--panel-soft); padding: 15px; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 15px;">
                     <label style="font-weight:bold; color:var(--primary); display:block; margin-bottom:10px;">إضافة منتجات للفاتورة:</label>
                     <div class="grid-2" style="align-items:end;">
-                        <div class="input-group" style="margin:0;"><label>المنتج</label><select id="purProductSelect"><option value="">اختر المنتج...</option></select></div>
+                        <div class="input-group" style="margin:0;"><label>المنتج</label><select id="purProductSelect"><option value="">اختر المنتج...</option></select></div><div class="input-group" style="margin:0;display:none" id="purVarWrap"><label>المقاس</label><select id="purSize"></select></div><div class="input-group" style="margin:0;display:none" id="purVarWrapC"><label>اللون</label><select id="purColor"></select></div>
                         <div class="input-group" style="margin:0;"><label>الكمية المستلمة</label><input type="number" id="purQty" value="1" min="1"></div>
                         <div class="input-group" style="margin:0;"><label>تكلفة القطعة (عليك)</label><input type="number" id="purCost" value="0"></div>
                         <button class="btn-save" onclick="addPurchaseItem()" style="height:44px; margin:0;">إضافة للقائمة</button>
@@ -1471,7 +1472,7 @@
         <div style="text-align: left; font-size: 16px; border-top: 2px solid black; padding-top: 10px;">
             <p style="margin: 5px 0;"><strong>الإجمالي قبل الخصم:</strong> <span id="invSubtotal"></span></p>
             <p style="margin: 5px 0; color: var(--accent);"><strong>الخصم:</strong> <span id="invDiscount"></span></p>
-            <p style="margin: 5px 0;"><strong>الإجمالي بعد الخصم:</strong> <span id="invAfter"></span></p><p style="margin: 5px 0;"><strong>الشحن:</strong> <span id="invShipping"></span></p><p style="margin: 10px 0 0 0; font-size: 22px; font-weight: bold;"><strong>الصافي للدفع:</strong> <span id="invTotal"></span></p>
+            <p style="margin: 5px 0;"><strong>الإجمالي بعد الخصم:</strong> <span id="invAfter"></span></p><p style="margin: 5px 0;"><strong>الشحن:</strong> <span id="invShipping"></span></p><p style="margin: 5px 0;"><strong>المدفوع:</strong> <span id="invPaid"></span></p><p style="margin: 5px 0;"><strong>المطلوب تحصيله:</strong> <span id="invDue"></span></p><p style="margin: 10px 0 0 0; font-size: 22px; font-weight: bold;"><strong>الصافي للدفع:</strong> <span id="invTotal"></span></p>
         </div>
         <div style="text-align: center; margin-top: 40px; font-size: 14px; border-top: 1px dashed black; padding-top: 15px;">شكراً لتسوقكم معنا!</div>
     </div>
@@ -1508,7 +1509,7 @@
         </div>
     </div>
     <!-- ربط ملف الجافاسكريبت -->
-    <script type="module" src="app.js?v=20260912-3"></script>
+    <script type="module" src="app.js?v=20261116"></script>
 
 <div id="stockEditModal" class="modal-overlay"><div class="modal" style="max-width:560px">
   <h3 style="margin-top:0">تعديل المخزون</h3>
