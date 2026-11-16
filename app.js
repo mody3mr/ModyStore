@@ -576,7 +576,7 @@ window.renderProducts = (filterType) => {
             <div class="product-card" data-product-id="${escapeHtml(p.id)}" style="animation-delay: ${index * 0.05}s" onclick="openProductDetails('${jsArg(p.id)}')">
                 ${badgeHtml}
                 <div class="product-img-wrapper">
-                    <img src="${escapeHtml(p.imageUrl || 'https://via.placeholder.com/300x300?text=صورة+المنتج')}" class="product-img" onerror="this.src='https://via.placeholder.com/300x300?text=صورة+المنتج'">
+                    <img loading="lazy" decoding="async" src="${escapeHtml(p.imageUrl || 'https://via.placeholder.com/300x300?text=صورة+المنتج')}" class="product-img" onerror="this.src='https://via.placeholder.com/300x300?text=صورة+المنتج'">
                 </div>
                 <div class="product-details">
                     <div class="product-cat">${escapeHtml(p.category || '')}</div>
@@ -648,7 +648,7 @@ window.openProductDetails = (id) => {
     const imgs = [p.imageUrl, ...Object.values(p.gallery || {})].filter(Boolean);
     let gi = 0;
     const showImg = i => { if (!imgs.length) return; gi = (i + imgs.length) % imgs.length; mainImg.src = imgs[gi]; gd.querySelectorAll('.opt-thumb').forEach((t, k) => t.classList.toggle('sel', k === gi)); };
-    gd.innerHTML = imgs.length > 1 ? imgs.map((u, k) => `<img src="${escapeHtml(u)}" data-i="${k}" class="opt-thumb${k === 0 ? ' sel' : ''}" alt="">`).join('') : '';
+    gd.innerHTML = imgs.length > 1 ? imgs.map((u, k) => `<img loading="lazy" decoding="async" src="${escapeHtml(u)}" data-i="${k}" class="opt-thumb${k === 0 ? ' sel' : ''}" alt="">`).join('') : '';
     gd.onclick = e => { const t = e.target.closest('.opt-thumb'); if (t) showImg(Number(t.dataset.i)); };
     const gbox = mainImg.parentElement;
     gbox.querySelectorAll('.g-nav').forEach(x => x.remove());
@@ -779,7 +779,7 @@ function updateCartUI() {
             container.innerHTML += `
                 <div class="cart-item">
                     <i class="fas fa-times remove-item" onclick="removeFromCart('${jsArg(item.id)}')"></i>
-                    <img src="${escapeHtml(item.img || 'https://via.placeholder.com/100')}" onerror="this.src='https://via.placeholder.com/100'">
+                    <img loading="lazy" decoding="async" src="${escapeHtml(item.img || 'https://via.placeholder.com/100')}" onerror="this.src='https://via.placeholder.com/100'">
                     <div class="cart-item-details">
                         <div class="cart-item-title">${escapeHtml(item.name || '')}</div>
                         <div class="cart-item-price">${Number(item.price || 0)} ج.م</div>
