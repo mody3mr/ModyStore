@@ -1009,7 +1009,7 @@ window.viewOrderDetails = (orderId) => {
     document.getElementById('invSubtotal').innerText = `${subtotal} ج.م`;
     document.getElementById('invDiscount').innerText = order.discount ? `${order.discount} ج.م` : '0 ج.م';
     document.getElementById('invTotal').innerText = `${Math.round(order.total || 0)} ج.م`;
-    { const __sh = Number(order.shipping ?? order.shippingFee ?? order.shippingCost ?? 0) || 0; const __total = Math.round(order.total || 0); document.getElementById('invShipping').innerText = `${__sh} ج.م`; document.getElementById('invAfter').innerText = `${Math.max(0, __total - __sh)} ج.م`; }
+    { const __sh = Number(order.shipping ?? order.shippingFee ?? order.shippingCost ?? 0) || 0; const __total = Math.round(order.total || 0); document.getElementById('invShipping').innerText = `${__sh} ج.م`; document.getElementById('invAfter').innerText = `${Math.max(0, __total - __sh)} ج.م`; const __py = order.payment; let __paid = 0; if (__py) { __paid = __py.mode === 'full' ? __total : (__py.mode === 'split' ? Math.round(Number(__py.deposit || __py.paid || 0)) : 0); if (__py.remainingCollected) __paid = __total; } else if (order.paymentConfirmation && order.paymentConfirmation.status === 'confirmed') __paid = __total; document.getElementById('invPaid').innerText = `${__paid} ج.م`; document.getElementById('invDue').innerText = `${Math.max(0, __total - __paid)} ج.م`; }
 
     // تجهيز بيانات الطباعة (بوليصة الشحن)
     const c = order.customer || {};
@@ -1322,14 +1322,7 @@ window.addPurchaseItem = () => {
         return window.showAlert('برجاء إدخال بيانات منتج صحيحة');
     }
     
-    const name = select.options[select.selectedIndex].getAttribute('data-name');
-    purItems.push({ 
-        id: select.value, 
-        name: name, 
-        qty: qty, 
-        cost: cost, 
-        total: qty * cost 
-    });
+    const __p = (allProducts || []).find(x => x.id === select.value); const __S = Object.values(__p?.sizes || {}), __C = Object.values(__p?.colors || {}); const __sz = document.getElementById('purSize')?.value || '', __cl = document.getElementById('purColor')?.value || ''; if ((__S.length && !__sz) || (__C.length && !__cl)) return window.showAlert('اختر المقاس واللون أولاً!', 'warning'); const name = select.options[select.selectedIndex].getAttribute('data-name') + (__sz ? ' - ' + __sz : '') + (__cl ? ' - ' + __cl : ''); purItems.push({ id: select.value, name: name, qty: qty, cost: cost, total: qty * cost, size: __sz, color: __cl });
     renderPurItems();
 };
 
@@ -1487,7 +1480,7 @@ window.deleteFinance = (id) => {
         return window.showAlert("غير مصرح لك بالحذف!", "error");
     }
     window.showConfirm("حذف العملية المالية من السجل؟", () => {
-        remove(ref(db, `finance/${id}`));
+        remove(ref(db, `finance/${id}`)); logAction('المالية','تم حذف عملية مالية');
     });
 };
 
@@ -3234,7 +3227,7 @@ if (myProfileBtn && myProfileMenu) {
 
     // --- vouchers: robust preview, discount amount, manual-disable status ---
     window.showVoucherUsers=(id)=>{if(!guard('vouchers','users','ليس لديك صلاحية رؤية مستخدمي الكوبون!'))return;const v=allVouchers.find(x=>x.id===id);if(!v)return;const list=document.getElementById('vuList');list.innerHTML='';const users=Array.isArray(v.usedBy)?v.usedBy:Object.values(v.usedBy||{});if(!users.length){list.innerHTML='<div style="text-align:center;padding:20px;color:#666">لم يستخدمه أحد بعد.</div>';}else users.forEach(u=>{const key=String(u.orderDbId||u.dbId||u.orderId||u.displayId||'');const order=allOrders.find(o=>String(o.dbId)===key||String(o.orderId)===key||String(o.displayId)===key);const disc=n(u.discountAmount??u.discount??order?.discount??0);list.innerHTML+=`<div style="padding:15px;border-bottom:1px solid #eee"><b>${esc(u.name||order?.customer?.name||'-')}</b><br><span dir="ltr">${esc(u.phone||order?.customer?.phone||'-')}</span><br><span style="color:#b45309;font-weight:bold">قيمة الخصم: ${money(disc)}</span><br><span style="font-size:12px;color:var(--muted-text)">رقم الطلب: #${esc(order?.displayId||u.displayId||u.orderId||'-')}</span><br>${order?`<button onclick="closeModal('voucherUsersModal'); viewOrderDetails('${order.dbId}')" style="margin-top:8px;background:var(--secondary);color:white;border:none;padding:5px 10px;border-radius:4px;cursor:pointer;font-size:12px"><i class="fas fa-file-invoice"></i> معاينة الطلب</button>`:'<span style="font-size:12px;color:#ef4444">الطلب المرتبط غير موجود حالياً</span>'}</div>`;});document.getElementById('voucherUsersModal').style.display='flex';};
-    window.filterVouchers=()=>{if(!modulePerm('vouchers','view'))return;const table=document.getElementById('vouchersTableBody');if(!table)return;const term=(document.getElementById('searchVouchers')?.value||'').toLowerCase();table.innerHTML='';(allVouchers||[]).filter(v=>(v.code||'').toLowerCase().includes(term)&& (currentVoucherTab==='active'?v.isActive:!v.isActive)).forEach(v=>{const used=Array.isArray(v.usedBy)?v.usedBy.length:Object.keys(v.usedBy||{}).length;const autoExpired=v.usageLimit&&used>=v.usageLimit;const status=v.isActive?'مفعل':'معطل';table.innerHTML+=`<tr><td><b>${esc(v.code)}</b></td><td>${v.value} ${v.type==='percentage'?'%':'ج.م'}</td><td><button class="btn-action btn-users" title="${used} استخدام" onclick="showVoucherUsers('${v.id}')"><i class="fas fa-users"></i></button><span style="margin-right:8px">${used}/${v.usageLimit||'-'}</span></td><td><span class="badge ${v.isActive?'badge-active':'badge-inactive'}">${autoExpired&&!v.isActive?'منتهي':' '+status}</span></td><td><div class="actions">${modulePerm('vouchers','edit')?`<button class="btn-action btn-edit" onclick="editVoucher('${v.id}')"><i class="fas fa-pen"></i></button>`:''}${modulePerm('vouchers','toggle')?`<button class="btn-action btn-hide" style="background:${v.isActive?'#64748b':'#22c55e'}" onclick="toggleVoucher('${v.id}',${!!v.isActive},'${esc(v.code)}')"><i class="fas ${v.isActive?'fa-ban':'fa-check'}"></i></button>`:''}${modulePerm('vouchers','delete')?`<button class="btn-action btn-delete" onclick="deleteVoucher('${v.id}','${esc(v.code)}')"><i class="fas fa-trash"></i></button>`:''}</div></td></tr>`;});};
+    window.filterVouchers=()=>{if(!modulePerm('vouchers','view'))return;const table=document.getElementById('vouchersTableBody');if(!table)return;const term=(document.getElementById('searchVouchers')?.value||'').toLowerCase();table.innerHTML='';(allVouchers||[]).filter(v=>(v.code||'').toLowerCase().includes(term)&& (currentVoucherTab==='active'?v.isActive:!v.isActive)).forEach(v=>{const used=Array.isArray(v.usedBy)?v.usedBy.length:Object.keys(v.usedBy||{}).length;const autoExpired=v.usageLimit&&used>=v.usageLimit;const status=v.isActive?'مفعل':'معطل';table.innerHTML+=`<tr><td><b>${esc(v.code)}</b></td><td>${v.type==='shipping'?'شحن مجاني':(v.value+' '+(v.type==='percentage'?'%':'ج.م'))}</td><td><button class="btn-action btn-users" title="${used} استخدام" onclick="showVoucherUsers('${v.id}')"><i class="fas fa-users"></i></button><span style="margin-right:8px">${used}/${v.usageLimit||'-'}</span></td><td><span class="badge ${v.isActive?'badge-active':'badge-inactive'}">${autoExpired&&!v.isActive?'منتهي':' '+status}</span></td><td><div class="actions">${modulePerm('vouchers','edit')?`<button class="btn-action btn-edit" onclick="editVoucher('${v.id}')"><i class="fas fa-pen"></i></button>`:''}${modulePerm('vouchers','toggle')?`<button class="btn-action btn-hide" style="background:${v.isActive?'#64748b':'#22c55e'}" onclick="toggleVoucher('${v.id}',${!!v.isActive},'${esc(v.code)}')"><i class="fas ${v.isActive?'fa-ban':'fa-check'}"></i></button>`:''}${modulePerm('vouchers','delete')?`<button class="btn-action btn-delete" onclick="deleteVoucher('${v.id}','${esc(v.code)}')"><i class="fas fa-trash"></i></button>`:''}</div></td></tr>`;});};
 
     // --- inventory ---
     let inventoryMovements=[];
@@ -3302,14 +3295,14 @@ if (myProfileBtn && myProfileMenu) {
         const table = document.getElementById('productsTableBody')?.closest('table');
         if (table) {
             const headers = [...table.querySelectorAll('thead th')];
-            const index = headers.findIndex(th => /المخزون/.test(th.textContent || ''));
+            const index = headers.findIndex(th => false);
             if (index >= 0) { headers[index].style.display='none'; table.querySelectorAll('tbody tr').forEach(row => row.children[index] && (row.children[index].style.display='none')); }
         }
         const funnel = document.querySelector('.analytics-funnel-cards');
         if (funnel) { funnel.previousElementSibling?.remove(); funnel.remove(); }
     }
     document.addEventListener('DOMContentLoaded', hideLegacyProductFields);
-    setInterval(hideLegacyProductFields, 1800);
+    setTimeout(hideLegacyProductFields, 800); setTimeout(hideLegacyProductFields, 3000);
 
     function populateManualShippingSelect() {
         const select = document.getElementById('manualCustCity');
@@ -3334,12 +3327,12 @@ if (myProfileBtn && myProfileMenu) {
             mini.addEventListener('change',()=>main.checked=mini.checked);
         });
     }
-    setInterval(syncPaymentSwitches,700);
+    { let __n = 0; const __t = setInterval(() => { syncPaymentSwitches(); if (++__n > 20) clearInterval(__t); }, 700); }
     window.setOrderPaymentStatus = async (orderId, status) => {
         const labels={paid:'تم الدفع',cod_pending:'الدفع عند الاستلام',manual_pending:'في انتظار التحويل',failed:'فشل الدفع'};
         const patch={paymentStatus:status,paymentStatusLabel:labels[status]||status,paymentStatusUpdatedAt:Date.now()};
         if (status==='paid') patch.paymentConfirmation={status:'confirmed',source:'dashboard',confirmedAt:Date.now()};
-        await update(ref(db,'orders/'+orderId),patch); notify('تم تحديث حالة الدفع','success');
+        await update(ref(db,'orders/'+orderId),patch); logAction('طلبات','تم تغيير حالة دفع طلب'); notify('تم تحديث حالة الدفع','success');
     };
 
     let shippingCompanies=[]; let shippingShipments=[]; let editingShippingCompanyId=null;
@@ -3356,11 +3349,11 @@ if (myProfileBtn && myProfileMenu) {
     onValue(ref(db,'shippingShipments'),snap=>{shippingShipments=[];if(snap.exists())snap.forEach(ch=>shippingShipments.push({id:ch.key,...(ch.val()||{})}));renderShippingShipments();});
     window.openShippingCompanyModal=id=>{editingShippingCompanyId=id||null;const c=shippingCompanies.find(x=>x.id===id)||{};document.getElementById('shippingCompanyModalTitle').textContent=id?'تعديل شركة شحن':'إضافة شركة شحن';[['shippingCompanyName',c.name],['shippingCompanyApiBaseUrl',c.apiBaseUrl],['shippingCompanyTrackingUrl',c.trackingUrlTemplate],['shippingCompanyAccount',c.accountNumber],['shippingCompanyApiKey',c.apiKey],['shippingCompanyApiSecret',c.apiSecret]].forEach(([k,v])=>{const el=document.getElementById(k);if(el)el.value=v||''});const active=document.getElementById('shippingCompanyActive');if(active)active.checked=c.isActive!==false;document.getElementById('shippingCompanyModal').style.display='flex';};
     window.editShippingCompany=id=>window.openShippingCompanyModal(id);
-    window.saveShippingCompany=async()=>{const name=document.getElementById('shippingCompanyName')?.value.trim();if(!name)return notify('اكتب اسم الشركة','error');const data={name,trackingUrlTemplate:document.getElementById('shippingCompanyTrackingUrl')?.value.trim()||'',accountNumber:document.getElementById('shippingCompanyAccount')?.value.trim()||'',isActive:Boolean(document.getElementById('shippingCompanyActive')?.checked),updatedAt:Date.now()};if(editingShippingCompanyId)await update(ref(db,'shippingCompanies/'+editingShippingCompanyId),data);else await push(ref(db,'shippingCompanies'),{...data,createdAt:Date.now()});closeModal('shippingCompanyModal');notify('تم حفظ شركة الشحن','success');};
-    window.toggleShippingCompany=async id=>{const c=shippingCompanies.find(x=>x.id===id);if(c)await update(ref(db,'shippingCompanies/'+id),{isActive:c.isActive===false,updatedAt:Date.now()});};
-    window.deleteShippingCompany=async id=>{if(confirm('حذف شركة الشحن؟'))await remove(ref(db,'shippingCompanies/'+id));};
+    window.saveShippingCompany=async()=>{const name=document.getElementById('shippingCompanyName')?.value.trim();if(!name)return notify('اكتب اسم الشركة','error');const data={name,trackingUrlTemplate:document.getElementById('shippingCompanyTrackingUrl')?.value.trim()||'',accountNumber:document.getElementById('shippingCompanyAccount')?.value.trim()||'',isActive:Boolean(document.getElementById('shippingCompanyActive')?.checked),updatedAt:Date.now()};if(editingShippingCompanyId)await update(ref(db,'shippingCompanies/'+editingShippingCompanyId),data);else await push(ref(db,'shippingCompanies'),{...data,createdAt:Date.now()});logAction('شركات الشحن','تم حفظ/تعديل شركة شحن');closeModal('shippingCompanyModal');notify('تم حفظ شركة الشحن','success');};
+    window.toggleShippingCompany=async id=>{const c=shippingCompanies.find(x=>x.id===id);if(c){await update(ref(db,'shippingCompanies/'+id),{isActive:c.isActive===false,updatedAt:Date.now()});logAction('شركات الشحن','تم تغيير حالة شركة شحن');}};
+    window.deleteShippingCompany=async id=>{if(confirm('حذف شركة الشحن؟')){await remove(ref(db,'shippingCompanies/'+id));logAction('شركات الشحن','تم حذف شركة شحن');}};
     window.openShippingShipmentModal=(orderId='')=>{const cs=document.getElementById('shipmentCompanySelect'),os=document.getElementById('shipmentOrderSelect');cs.innerHTML=shippingCompanies.filter(c=>c.isActive!==false).map(c=>`<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('');os.innerHTML=activeOrders().map(o=>`<option value="${esc(o.dbId)}" ${o.dbId===orderId?'selected':''}>#${esc(o.displayId||o.orderId)} — ${esc(o.customer?.name||'')}</option>`).join('');document.getElementById('shippingShipmentModal').style.display='flex';};
-    window.createShippingShipment=async()=>{const cid=document.getElementById('shipmentCompanySelect')?.value,oid=document.getElementById('shipmentOrderSelect')?.value,c=shippingCompanies.find(x=>x.id===cid),o=activeOrders().find(x=>x.dbId===oid);if(!c||!o)return notify('اختر الشركة والطلب','error');const confirmed=o.paymentConfirmation?.status==='confirmed'||o.status==='جاري التجهيز'||o.status==='تم الشحن'||o.paymentMethod==='الدفع عند الاستلام';if(!confirmed)return notify('أكد الطلب والدفع قبل إرساله لشركة الشحن','error');await push(ref(db,'shippingShipments'),{companyId:c.id,companyName:c.name,orderId:o.dbId,orderDisplayId:o.displayId||o.orderId,customerName:o.customer?.name||'',customer:o.customer||{},items:o.items||[],manualDetails:document.getElementById('shipmentManualDetails')?.value||'',status:'pending_api',createdAt:Date.now()});await update(ref(db,'orders/'+o.dbId),{shippingStatus:'جاهز للإرسال',shippingCompanyId:c.id,shippingCompanyName:c.name});closeModal('shippingShipmentModal');notify('تم تجهيز الشحنة للطباعة','success');};
+    window.createShippingShipment=async()=>{const cid=document.getElementById('shipmentCompanySelect')?.value,oid=document.getElementById('shipmentOrderSelect')?.value,c=shippingCompanies.find(x=>x.id===cid),o=activeOrders().find(x=>x.dbId===oid);if(!c||!o)return notify('اختر الشركة والطلب','error');const confirmed=o.paymentConfirmation?.status==='confirmed'||o.status==='جاري التجهيز'||o.status==='تم الشحن'||o.paymentMethod==='الدفع عند الاستلام';if(!confirmed)return notify('أكد الطلب والدفع قبل إرساله لشركة الشحن','error');await push(ref(db,'shippingShipments'),{companyId:c.id,companyName:c.name,orderId:o.dbId,orderDisplayId:o.displayId||o.orderId,customerName:o.customer?.name||'',customer:o.customer||{},items:o.items||[],manualDetails:document.getElementById('shipmentManualDetails')?.value||'',status:'pending_api',createdAt:Date.now()});await update(ref(db,'orders/'+o.dbId),{shippingStatus:'جاهز للإرسال',shippingCompanyId:c.id,shippingCompanyName:c.name});closeModal('shippingShipmentModal');logAction('شحنات','تم إنشاء شحنة');notify('تم تجهيز الشحنة للطباعة','success');};
     window.printShippingWaybill=id=>{const s=shippingShipments.find(x=>x.id===id);if(!s)return;const w=window.open('','_blank');if(!w)return;const rows=(s.items||[]).map(i=>`<tr><td>${esc(i.name||'-')}</td><td>${Number(i.qty||1)}</td><td>${Number(i.price||0)}</td></tr>`).join('');w.document.write(`<html dir="rtl"><head><title>بوليصة شحن</title><style>body{font-family:Arial;padding:30px}table{width:100%;border-collapse:collapse}td,th{border:1px solid #ddd;padding:8px}</style></head><body><h1>بوليصة شحن</h1><p>الطلب: #${esc(s.orderDisplayId)}</p><p>العميل: ${esc(s.customerName)}</p><p>الهاتف: ${esc(s.customer?.phone||'-')}</p><p>العنوان: ${esc(s.customer?.address||'-')}</p><table><tr><th>المنتج</th><th>الكمية</th><th>السعر</th></tr>${rows}</table><p>${esc(s.manualDetails||'')}</p><script>window.print()<\/script></body></html>`);w.document.close();};
 })();
 
@@ -3521,7 +3514,7 @@ if (myProfileBtn && myProfileMenu) {
         if (price > 0 && duration <= 0) return showAlert('حدد مدة العرض أولاً.','warning');
         const end=price>0&&duration>0?Date.now()+duration*(unit==='days'?86400000:unit==='minutes'?60000:3600000):null;
         await update(ref(db,`products/${id}`),{discountPrice:price||0,offerDuration:duration||0,offerUnit:unit,offerStartedAt:price>0?Date.now():0,offerEndAt:end||0});
-        showAlert('تم حفظ العرض بنجاح','success'); renderOffers();
+        logAction('عروض','تم حفظ/تعديل عرض على منتج'); showAlert('تم حفظ العرض بنجاح','success'); renderOffers();
     };
     window.switchOffersTab = (tab, button) => {
         currentOffersTab = tab;
@@ -3676,7 +3669,7 @@ if (myProfileBtn && myProfileMenu) {
     const oldEditVoucherV2=window.editVoucher;window.editVoucher=(id)=>{if(!window.hasDashboardPermission('vouchers','edit'))return window.showAlert('ليس لديك صلاحية تعديل الكوبونات!','error');return oldEditVoucherV2(id);};
     window.toggleVoucher=(id,status,code)=>{if(!window.hasDashboardPermission('vouchers','toggle'))return window.showAlert('ليس لديك صلاحية تفعيل/تعطيل الكوبونات!','error');update(ref(db,`vouchers/${id}`),{isActive:!status}).then(()=>logAction(status?'تعطيل كوبون':'تفعيل كوبون',`تغيير حالة الكود ${code} إلى ${!status?'مفعل':'معطل'}`));};
     window.deleteVoucher=(id,code)=>{if(!window.hasDashboardPermission('vouchers','delete'))return window.showAlert('ليس لديك صلاحية حذف الكوبونات!','error');showConfirm('حذف الكوبون نهائياً؟',()=>remove(ref(db,`vouchers/${id}`)).then(()=>logAction('حذف كوبون',`تم حذف الكود: ${code}`)));};
-    window.filterVouchers=()=>{if(!window.hasDashboardPermission('vouchers','view'))return;const table=document.getElementById('vouchersTableBody');if(!table)return;const term=(document.getElementById('searchVouchers')?.value||'').toLowerCase();const active=currentVoucherTab==='active';table.innerHTML=(allVouchers||[]).filter(v=>(v.code||'').toLowerCase().includes(term)&&(active?v.isActive:!v.isActive)).map(v=>{const used=Array.isArray(v.usedBy)?v.usedBy.length:Object.keys(v.usedBy||{}).length;const usedUp=!!v.usageLimit&&used>=Number(v.usageLimit);const status=usedUp?'مستخدم':(v.isActive?'مفعل':'معطل');return `<tr><td><b>${esc2(v.code)}</b></td><td>${v.value} ${v.type==='percentage'?'%':'ج.م'}</td><td><button class="btn-action btn-users" onclick="showVoucherUsers('${v.id}')"><i class="fas fa-users"></i></button> <span>${used}/${v.usageLimit||'-'}</span></td><td><span class="badge ${status==='مفعل'?'badge-active':'badge-inactive'}">${status}</span></td><td><div class="actions">${window.hasDashboardPermission('vouchers','edit')?`<button class="btn-action btn-edit" onclick="editVoucher('${v.id}')"><i class="fas fa-pen"></i></button>`:''}${window.hasDashboardPermission('vouchers','toggle')?`<button class="btn-action btn-hide" style="background:${v.isActive?'#64748b':'#22c55e'}" onclick="toggleVoucher('${v.id}',${!!v.isActive},'${esc2(v.code)}')"><i class="fas ${v.isActive?'fa-ban':'fa-check'}"></i></button>`:''}${window.hasDashboardPermission('vouchers','delete')?`<button class="btn-action btn-delete" onclick="deleteVoucher('${v.id}','${esc2(v.code)}')"><i class="fas fa-trash"></i></button>`:''}</div></td></tr>`;}).join('');};
+    window.filterVouchers=()=>{if(!window.hasDashboardPermission('vouchers','view'))return;const table=document.getElementById('vouchersTableBody');if(!table)return;const term=(document.getElementById('searchVouchers')?.value||'').toLowerCase();const active=currentVoucherTab==='active';table.innerHTML=(allVouchers||[]).filter(v=>(v.code||'').toLowerCase().includes(term)&&(active?v.isActive:!v.isActive)).map(v=>{const used=Array.isArray(v.usedBy)?v.usedBy.length:Object.keys(v.usedBy||{}).length;const usedUp=!!v.usageLimit&&used>=Number(v.usageLimit);const status=usedUp?'مستخدم':(v.isActive?'مفعل':'معطل');return `<tr><td><b>${esc2(v.code)}</b></td><td>${v.type==='shipping'?'شحن مجاني':(v.value+' '+(v.type==='percentage'?'%':'ج.م'))}</td><td><button class="btn-action btn-users" onclick="showVoucherUsers('${v.id}')"><i class="fas fa-users"></i></button> <span>${used}/${v.usageLimit||'-'}</span></td><td><span class="badge ${status==='مفعل'?'badge-active':'badge-inactive'}">${status}</span></td><td><div class="actions">${window.hasDashboardPermission('vouchers','edit')?`<button class="btn-action btn-edit" onclick="editVoucher('${v.id}')"><i class="fas fa-pen"></i></button>`:''}${window.hasDashboardPermission('vouchers','toggle')?`<button class="btn-action btn-hide" style="background:${v.isActive?'#64748b':'#22c55e'}" onclick="toggleVoucher('${v.id}',${!!v.isActive},'${esc2(v.code)}')"><i class="fas ${v.isActive?'fa-ban':'fa-check'}"></i></button>`:''}${window.hasDashboardPermission('vouchers','delete')?`<button class="btn-action btn-delete" onclick="deleteVoucher('${v.id}','${esc2(v.code)}')"><i class="fas fa-trash"></i></button>`:''}</div></td></tr>`;}).join('');};
 
     // Shipping full CRUD with audit logs.
     window.saveShipping=()=>{
@@ -4214,7 +4207,7 @@ if (myProfileBtn && myProfileMenu) {
             customer:{name,phone,phone2,city,region,address},
             items:manualOrderItems.map(i=>({id:i.id,name:i.name,qty:i.qty,price:i.price,size:i.size||'',color:i.color||''})),
             shippingCost:totals.shipping, discount:totals.discount, subtotal:totals.subtotal,
-            total:totals.total, paymentMethod, paymentStatus:paymentMethod==='كاش'?'pending':'pending',
+            total:totals.total, paymentMethod, paymentStatus:paymentMethod==='كاش'?'pending':'pending', payment: (window.__manualPaymentObj ? window.__manualPaymentObj(totals.total, paymentMethod) : null),
             notes, status:'قيد المراجعة'
         });
         try{
@@ -4235,7 +4228,7 @@ if (myProfileBtn && myProfileMenu) {
             }
             await push(ref(db,'logs'),cleanData({action:'إنشاء طلب يدوي',details:`إنشاء الطلب ${orderId} من مصدر ${source}`,user:currentUser,timestamp:Date.now()}));
             closeModal('manualOrderModal');
-            window.showAlert(`تم إنشاء الطلب #${orderId} بنجاح`, 'success');
+            logAction('أوردر يدوي','تم إنشاء أوردر يدوي'); window.showAlert(`تم إنشاء الطلب #${orderId} بنجاح`, 'success');
             window.switchOrderTab?.('active');
         }catch(e){
             console.error(e);
@@ -5109,7 +5102,7 @@ if (myProfileBtn && myProfileMenu) {
         const total = (purItems || []).reduce((sum, item) => sum + Number(item.total || 0), 0) + shipping;
         if (!(purItems || []).length) return showAlert('الفاتورة فارغة','error');
         await push(ref(db,'finance'), cleanData({type:'purchase',title:`فاتورة مشتريات (مورد: ${supplier})`,supplier,invoiceNo,items:purItems,shipping,amount:total,imageUrl,timestamp:Date.now(),user:currentUser||'مدير'}));
-        for (const item of purItems) { const productRef=ref(db,`products/${item.id}`); const snap=await get(productRef); if(snap.exists()) await update(productRef,{stock:Number(snap.val().stock||0)+Number(item.qty||0)}); }
+        for (const item of purItems) { const productRef=ref(db,`products/${item.id}`); const snap=await get(productRef); if(!snap.exists()) continue; const pv=snap.val(); const q=Number(item.qty||0); if(item.size||item.color){ const k=vsKey(item.size||'',item.color||''); const vs=Object.assign({},pv.variantStock||{}); vs[k]=Number(vs[k]||0)+q; await update(productRef,{variantStock:vs,stock:Object.values(vs).reduce((t,x)=>t+(Number(x)||0),0)}); } else { await update(productRef,{stock:Number(pv.stock||0)+q}); } }
         logAction('مشتريات',`إدخال فاتورة مشتريات رقم ${invoiceNo} بقيمة ${total} ج.م`); showAlert('تم إنشاء الفاتورة وتحديث المخزون','success'); purItems=[]; closeModal('purchaseModal');
     };
     const baseExpense = window.saveExpense;
@@ -5208,7 +5201,7 @@ if (myProfileBtn && myProfileMenu) {
         try {
             await update(ref(db, 'orders/' + orderId), patch);
             if (order) order.paymentConfirmation = patch.paymentConfirmation;
-            window.showAlert?.(status === 'confirmed' ? 'تم تأكيد الدفع.' : 'تم تحديث حالة الدفع.','success');
+            logAction('طلبات','تم تأكيد/تعديل دفع طلب'); window.showAlert?.(status === 'confirmed' ? 'تم تأكيد الدفع.' : 'تم تحديث حالة الدفع.','success');
             window.renderOrdersTable?.();
         } catch (e) { console.error(e); window.showAlert?.('تعذر تحديث حالة الدفع.','error'); }
     };
@@ -5329,7 +5322,7 @@ window.seSave=async()=>{
  const hasV=Object.values(p.sizes||{}).length||Object.values(p.colors||{}).length;
  try{await update(ref(db,'products/'+id),hasV?{stock:after,variantStock:map}:{stock:after});
   await push(ref(db,'inventoryMovements'),{productId:id,productName:p.name||'',before:window.__seBefore,after,reason:window.__seBefore>0?reason:'إضافة مخزون أولي',user:window.currentUserName||'مدير',timestamp:Date.now()});
-  document.getElementById('stockEditModal').style.display='none';window.showAlert('تم حفظ المخزون.','success');}
+  document.getElementById('stockEditModal').style.display='none';logAction('تعديل المخزون',`تعديل مخزون ${p.name||''}: ${window.__seBefore} ← ${after}`);window.showAlert('تم حفظ المخزون.','success');}
  catch(e){console.error(e);window.showAlert('تعذر حفظ المخزون.','error');}};
 // بحث العروض
 window.filterOffers=()=>{const q=(document.getElementById('offersSearch')?.value||'').trim().toLowerCase();document.querySelectorAll('#offersTableBody tr').forEach(tr=>{tr.style.display=!q||tr.textContent.toLowerCase().includes(q)?'':'none';});};
@@ -5478,7 +5471,7 @@ window.opConfirm=id=>{const o=opFind(id);if(!o)return;
    <div class="input-group" id="opRefWrap"><label>الرقم المرجعي للعملية *</label><input type="text" id="opRef" maxlength="60"></div>
    <div class="input-group"><label>رابط صورة الإيصال (اختياري)</label><input type="text" id="opReceipt" placeholder="https://..."></div>
    <div style="display:flex;gap:10px"><button class="op-btn op-ok" onclick="opConfirmSave('${__escH(id)}')">تأكيد الطلب</button><button class="op-btn op-ghost" onclick="opClose()">إلغاء</button></div>`);
-  document.getElementById('opPayMode').value=(cur==='الدفع عند الاستلام')?'cod':'full';window.opPayModeChange();};
+  document.getElementById('opPayMode').value=(o.payment&&o.payment.mode)||((cur==='الدفع عند الاستلام')?'cod':'full');if(o.payment){if(o.payment.mode==='split')document.getElementById('opDeposit').value=o.payment.deposit;document.getElementById('opRef').value=o.payment.ref||'';}window.opPayModeChange();};
 window.opPayModeChange=()=>{const mode=document.getElementById('opPayMode')?.value,o=opFind(window.__opId);
   const dw=document.getElementById('opDepWrap'),rw=document.getElementById('opRefWrap');if(dw)dw.style.display=mode==='split'?'':'none';if(rw)rw.style.display=mode==='cod'?'none':'';
   const total=Math.round(opN(o?.total)),v=opN(document.getElementById('opDeposit')?.value),r=document.getElementById('opRemain');if(r)r.textContent=(mode==='split'&&v>0)?`الباقي عند الاستلام: ${opM(total-v)}`:'';};
@@ -5588,3 +5581,82 @@ onValue(ref(db,'shipping'),snap=>{const rows=[];snap.forEach(c=>{const v=c.val()
 onValue(ref(db,'analytics/sessions'),snap=>{const day=new Date();day.setHours(0,0,0,0);const now=Date.now();let today=0,week=0,total=0;
   snap.forEach(c=>{const s=c.val()||{};const t=Number(s.firstVisitAt)||Number(s.lastSeenAt)||0;total++;if(t>=day.getTime())today++;if(t>=now-7*86400000)week++;});
   const a=document.getElementById('statVisitsToday'),b=document.getElementById('statVisitsMeta');if(a)a.innerText=today;if(b)b.innerText=`اليوم · ${week} آخر 7 أيام · ${total} إجمالي`;},()=>{});
+
+
+// ===================== قائمة الموبايل (فتح/إغلاق مضمون) =====================
+{const sb=document.getElementById('sidebar');if(sb){const isM=()=>innerWidth<=768;
+  const mk=(tag,id,html,aria)=>{let e=document.getElementById(id);if(!e){e=document.createElement(tag);e.id=id;e.type='button';if(aria)e.setAttribute('aria-label',aria);e.innerHTML=html;}return e;};
+  let bd=document.getElementById('sidebarBackdrop');if(!bd){bd=document.createElement('div');bd.id='sidebarBackdrop';document.body.appendChild(bd);}
+  const fab=mk('button','mobileMenuBtn','<i class="fas fa-bars"></i>','القائمة');if(!fab.parentNode)document.body.appendChild(fab);
+  const cl=mk('button','sidebarClose','&times;','إغلاق القائمة');if(!cl.parentNode)sb.prepend(cl);
+  const setOpen=o=>{if(!isM())return;sb.classList.toggle('collapsed',o);document.body.classList.toggle('sidebar-mobile-open',o);};
+  window.toggleSidebarMobile=()=>setOpen(!sb.classList.contains('collapsed'));
+  fab.onclick=e=>{e.preventDefault();e.stopPropagation();window.toggleSidebarMobile();};cl.onclick=()=>setOpen(false);bd.onclick=()=>setOpen(false);
+  sb.addEventListener('click',e=>{if(isM()&&e.target.closest('.nav-links li, .nav-links a'))setOpen(false);});
+  const tg=document.getElementById('sidebarToggle');if(tg)tg.onclick=e=>{e.preventDefault();if(isM())window.toggleSidebarMobile();else sb.classList.toggle('collapsed');};
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')setOpen(false);});
+  addEventListener('resize',()=>{if(!isM())document.body.classList.remove('sidebar-mobile-open');});
+  if(isM()){sb.classList.remove('collapsed');document.body.classList.remove('sidebar-mobile-open');}}}
+
+// ===================== حالة الدفع في الأوردر اليدوي =====================
+window.__manualPaymentObj=(total,method)=>{const mode=document.getElementById('manualPayMode')?.value||'cod';const t=Math.round(opN(total));
+  if(mode==='full')return {method,mode:'full',total:t,paid:t,deposit:0,remaining:0,confirmedAt:Date.now(),confirmedBy:opWho(),ref:'',receiptUrl:''};
+  if(mode==='split'){const dep=Math.round(opN(document.getElementById('manualDeposit')?.value));
+    if(dep>0&&dep<t)return {method,mode:'split',total:t,paid:dep,deposit:dep,remaining:t-dep,confirmedAt:Date.now(),confirmedBy:opWho(),ref:'',receiptUrl:''};
+    window.showAlert?.('المبلغ المدفوع غير صحيح، تم اعتبار الأوردر "عند الاستلام".','warning');}
+  return {method,mode:'cod',total:t,paid:0,deposit:0,remaining:t,ref:'',receiptUrl:''};};
+document.getElementById('manualPayMode')?.addEventListener('change',e=>{const w=document.getElementById('manualDepWrap');if(w)w.style.display=e.target.value==='split'?'':'none';});
+
+// ===================== فاتورة المشتريات: المقاس واللون =====================
+document.getElementById('purProductSelect')?.addEventListener('change',e=>{
+  const p=(allProducts||[]).find(x=>x.id===e.target.value),S=Object.values(p?.sizes||{}),C=Object.values(p?.colors||{});
+  const fill=(id,wid,arr,ph)=>{const el=document.getElementById(id),w=document.getElementById(wid);if(!el||!w)return;el.innerHTML=`<option value="">${ph}</option>`+arr.map(v=>`<option>${__escH(v)}</option>`).join('');w.style.display=arr.length?'':'none';};
+  fill('purSize','purVarWrap',S,'اختر المقاس');fill('purColor','purVarWrapC',C,'اختر اللون');});
+
+// ===================== استرجاع كمية جزئية =====================
+{const modal=document.getElementById('newReturnModal');
+ const addQty=()=>{const o=currentReturnOrderTemp;if(!o)return;document.querySelectorAll('.ret-item-cb').forEach(cb=>{if(cb.dataset.qtyInit)return;cb.dataset.qtyInit='1';
+   const idx=Number(cb.dataset.index),it=(o.items||[])[idx];if(!it)return;const max=Math.max(0,opN(it.qty)-opN(o.returnedQty?.[idx]));
+   const host=cb.parentElement;host.insertAdjacentHTML('beforeend',`<span class="ret-qty-wrap" style="display:inline-flex;gap:4px;align-items:center;margin-inline-start:10px">الكمية: <input type="number" class="ret-qty" data-index="${idx}" min="1" max="${max}" value="${max}" style="width:64px;padding:4px"> / ${max}</span>`);});};
+ if(modal)new MutationObserver(addQty).observe(modal,{childList:true,subtree:true});}
+window.confirmReturnOrder=async()=>{
+  if(!window.hasDashboardPermission('returns','create'))return window.showAlert('ليس لديك صلاحية!','error');
+  const order=currentReturnOrderTemp;if(!order)return;
+  const reason=document.getElementById('retReason')?.value,notes=(document.getElementById('retNotes')?.value||'').trim(),restore=!!document.getElementById('retRestoreStock')?.checked;
+  if(!reason)return window.showAlert('اختر سبب المرتجع.','warning');
+  const checked=[...document.querySelectorAll('.ret-item-cb:checked')];if(!checked.length)return window.showAlert('اختر منتجًا واحدًا على الأقل.','warning');
+  const items=[];let amount=0;
+  for(const cb of checked){const idx=Number(cb.dataset.index),it=(order.items||[])[idx];if(!it)continue;const max=opN(it.qty)-opN(order.returnedQty?.[idx]);
+    const q=Math.floor(opN(cb.closest('div,label')?.querySelector('.ret-qty')?.value)||max);
+    if(q<1||q>max)return window.showAlert(`كمية "${it.name}" لازم تكون بين 1 و ${max}.`,'error');
+    items.push({...it,qty:q,_idx:idx});amount+=q*opN(it.price);}
+  try{const now=Date.now();
+    await push(ref(db,'returns'),cleanData({orderDbId:order.dbId,orderId:order.orderId||order.displayId,customer:order.customer||{},items:items.map(({_idx,...r})=>r),amount,reason,notes,stockRestored:restore,status:'تم',createdAt:now,createdBy:opWho()}));
+    const returned=Object.assign({},order.returnedQty||{});items.forEach(it=>{returned[it._idx]=opN(returned[it._idx])+it.qty;});
+    const totalQty=(order.items||[]).reduce((t,i)=>t+opN(i.qty),0),totalRet=Object.values(returned).reduce((t,x)=>t+opN(x),0);
+    const patch={returnedQty:returned,partialReturn:totalRet<totalQty};if(totalRet>=totalQty){patch.status='مرتجع';patch.returnedAt=now;}
+    await update(ref(db,'orders/'+order.dbId),patch);
+    if(restore){for(const it of items){const pr=ref(db,'products/'+it.id),snap=await get(pr);if(!snap.exists())continue;const pv=snap.val();const upd={stock:opN(pv.stock)+it.qty};
+        if(pv.variantStock&&(it.size||it.color)){const k=vsKey(it.size||'',it.color||'');upd['variantStock/'+k]=opN(pv.variantStock[k])+it.qty;}await update(pr,upd);}}
+    logAction('مرتجع',`مرتجع من الطلب #${order.orderId||order.displayId}: ${items.map(i=>i.name+' ×'+i.qty).join('، ')} — ${amount} ج.م — ${reason}`);
+    closeModal('newReturnModal');window.showAlert('تم تسجيل المرتجع.','success');
+  }catch(e){console.error(e);window.showAlert('تعذر تسجيل المرتجع.','error');}};
+
+// ===================== استخدام الكوبونات (من الطلبات) + المستفيدين =====================
+function enrichVouchersUsage(){const vs=allVouchers||[],byCode={};vs.forEach(v=>{byCode[String(v.code||'').toUpperCase()]=v;if(!v.__real)v.__real=Object.assign({},v.users||{});v.users=Object.assign({},v.__real);});
+  (allOrders||[]).filter(o=>opN(o.discount)>0&&o.status!=='ملغي').forEach(o=>{
+    const code=String(o.voucher?.code||o.voucherCode||'').toUpperCase();let v=code?byCode[code]:null;
+    if(!v&&!code){const cands=vs.filter(x=>x.type==='fixed'&&opN(x.value)===opN(o.discount));if(cands.length===1)v=cands[0];}
+    if(!v)return;const exists=Object.values(v.users).some(u=>String(u.orderId||'')===String(o.orderId||'')||String(u.orderDbId||'')===String(o.dbId));
+    if(!exists)v.users['o_'+o.dbId]={name:o.customer?.name||'',phone:o.customer?.phone||'',orderDbId:o.dbId,orderId:o.orderId||o.displayId,displayId:o.displayId||o.orderId,discountAmount:opN(o.discount)};});}
+window.syncVoucherLookup=()=>{const lk={};(allVouchers||[]).forEach(v=>{const c=String(v.code||'').toUpperCase().replace(/[.#$\[\]\/]/g,'');if(c&&v.isActive!==false&&!(opN(v.usageLimit)>0&&Object.keys(v.users||{}).length>=opN(v.usageLimit)))lk[c]={code:c,type:v.type||'',value:opN(v.value),isActive:true,id:v.id};});set(ref(db,'voucherLookup'),lk).catch(()=>{});};
+{const prev=window.filterVouchers;window.filterVouchers=(...a)=>{try{enrichVouchersUsage();}catch(e){console.error(e);}return prev?.(...a);};}
+{const rot=window.renderOrdersTable;let tmo;window.renderOrdersTable=(...a)=>{const r=rot(...a);clearTimeout(tmo);tmo=setTimeout(()=>{try{window.filterVouchers?.();window.syncVoucherLookup();window.updateBeneficiaries?.();}catch(e){}},400);return r;};}
+document.getElementById('voucherType')?.addEventListener('change',e=>{const v=document.getElementById('voucherValue');if(!v)return;if(e.target.value==='shipping'){v.value=0;v.disabled=true;}else v.disabled=false;});
+window.updateBeneficiaries=()=>{const th=[...document.querySelectorAll('th')].find(x=>x.textContent.trim()==='قيمة الخصم');if(!th)return;const table=th.closest('table');if(!table)return;
+  let box=document.getElementById('benefSummary');if(!box){box=document.createElement('div');box.id='benefSummary';box.className='rpt-grid';table.parentElement.insertBefore(box,table);}
+  const list=(allOrders||[]).filter(o=>opN(o.discount)>0&&o.status!=='ملغي'),uniq=new Set(list.map(o=>String(o.customer?.phone||o.customer?.name||'')));
+  const sum=list.reduce((t,o)=>t+opN(o.discount),0);
+  box.innerHTML=`<div><small>عدد المستفيدين</small><b>${uniq.size}</b></div><div><small>عدد الطلبات المخفّضة</small><b>${list.length}</b></div><div class="wide"><small>إجمالي الخصومات</small><b>${opM(sum)}</b></div>`;
+  const tb=table.querySelector('tbody');if(tb&&!tb.dataset.obs){tb.dataset.obs='1';new MutationObserver(()=>window.updateBeneficiaries()).observe(tb,{childList:true});}};
+setTimeout(()=>window.updateBeneficiaries?.(),1500);
