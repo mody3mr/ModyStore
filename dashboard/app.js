@@ -2377,7 +2377,7 @@ onValue(ref(db, 'vouchers'), (snapshot) => {
         }
         window.filterVouchers();
         const lk = {};
-        allVouchers.forEach(v => { const c = String(v.code || '').toUpperCase().replace(/[.#$\[\]\/]/g, ''); if (c && v.isActive !== false && !(Number(v.usageLimit) > 0 && Object.keys(v.users || {}).length >= Number(v.usageLimit))) lk[c] = { code: c, type: v.type || '', value: Number(v.value) || 0, isActive: true, id: v.id }; });
+        allVouchers.forEach(v => { const c = String(v.code || '').toUpperCase().replace(/[.#$\[\]\/]/g, ''); if (c && v.isActive !== false && !(Number(v.usageLimit) > 0 && Object.keys(v.usedBy || {}).length >= Number(v.usageLimit))) lk[c] = { code: c, type: v.type || '', value: Number(v.value) || 0, isActive: true, id: v.id }; });
         set(ref(db, 'voucherLookup'), lk).catch(() => {});
     } catch(err) {
         console.error(err);
@@ -3751,8 +3751,7 @@ if (myProfileBtn && myProfileMenu) {
     window.saveVoucher = () => {
         const code = (document.getElementById('voucherCode')?.value || '').trim().toUpperCase();
         if(!/^[A-Z0-9]+$/.test(code)) return window.showAlert('كود الكوبون يجب أن يحتوي على حروف إنجليزية وأرقام فقط!','error');
-        document.getElementById('voucherCode').value = code;
-        return oldSaveVoucherFinal();
+        document.getElementById('voucherCode').value = code; const __eid = (typeof editingVoucherId !== 'undefined') ? editingVoucherId : null; if ((allVouchers || []).some(v => v.id !== __eid && String(v.code || '').toUpperCase() === code)) return window.showAlert('هذا الكود موجود بالفعل. اختر كودًا مختلفًا.', 'warning'); return oldSaveVoucherFinal();
     };
     const oldExportSalesFinal = window.exportReportToExcel;
     window.exportReportToExcel = () => {
@@ -5643,20 +5642,19 @@ window.confirmReturnOrder=async()=>{
   }catch(e){console.error(e);window.showAlert('تعذر تسجيل المرتجع.','error');}};
 
 // ===================== استخدام الكوبونات (من الطلبات) + المستفيدين =====================
-function enrichVouchersUsage(){const vs=allVouchers||[],byCode={};vs.forEach(v=>{byCode[String(v.code||'').toUpperCase()]=v;if(!v.__real)v.__real=Object.assign({},v.users||{});v.users=Object.assign({},v.__real);});
-  (allOrders||[]).filter(o=>opN(o.discount)>0&&o.status!=='ملغي').forEach(o=>{
-    const code=String(o.voucher?.code||o.voucherCode||'').toUpperCase();let v=code?byCode[code]:null;
-    if(!v&&!code){const cands=vs.filter(x=>x.type==='fixed'&&opN(x.value)===opN(o.discount));if(cands.length===1)v=cands[0];}
-    if(!v)return;const exists=Object.values(v.users).some(u=>String(u.orderId||'')===String(o.orderId||'')||String(u.orderDbId||'')===String(o.dbId));
-    if(!exists)v.users['o_'+o.dbId]={name:o.customer?.name||'',phone:o.customer?.phone||'',orderDbId:o.dbId,orderId:o.orderId||o.displayId,displayId:o.displayId||o.orderId,discountAmount:opN(o.discount)};});}
-window.syncVoucherLookup=()=>{const lk={};(allVouchers||[]).forEach(v=>{const c=String(v.code||'').toUpperCase().replace(/[.#$\[\]\/]/g,'');if(c&&v.isActive!==false&&!(opN(v.usageLimit)>0&&Object.keys(v.users||{}).length>=opN(v.usageLimit)))lk[c]={code:c,type:v.type||'',value:opN(v.value),isActive:true,id:v.id};});set(ref(db,'voucherLookup'),lk).catch(()=>{});};
+function enrichVouchersUsage(){const vs=allVouchers||[],byCode={};
+  vs.forEach(v=>{byCode[String(v.code||'').toUpperCase()]=v;if(!v.__real)v.__real=Object.assign({},v.usedBy||{});v.usedBy=Object.assign({},v.__real);});
+  (allOrders||[]).forEach(o=>{if(o.status==='ملغي')return;const code=String(o.voucher?.code||o.voucherCode||'').toUpperCase();const v=code?byCode[code]:null;if(!v)return;
+    const exists=Object.values(v.usedBy).some(u=>String(u.orderId||'')===String(o.orderId||o.dbId)||String(u.orderDbId||'')===String(o.dbId));if(exists)return;
+    v.usedBy['o_'+o.dbId]={name:o.customer?.name||'',phone:o.customer?.phone||'',orderDbId:o.dbId,orderId:o.orderId||o.displayId,displayId:o.displayId||o.orderId,discountAmount:opN(o.discount),code:v.code};});}
+window.syncVoucherLookup=()=>{const lk={};(allVouchers||[]).forEach(v=>{const c=String(v.code||'').toUpperCase().replace(/[.#$\[\]\/]/g,'');if(c&&v.isActive!==false&&!(opN(v.usageLimit)>0&&Object.keys(v.usedBy||{}).length>=opN(v.usageLimit)))lk[c]={code:c,type:v.type||'',value:opN(v.value),isActive:true,id:v.id};});set(ref(db,'voucherLookup'),lk).catch(()=>{});};
 {const prev=window.filterVouchers;window.filterVouchers=(...a)=>{try{enrichVouchersUsage();}catch(e){console.error(e);}return prev?.(...a);};}
 {const rot=window.renderOrdersTable;let tmo;window.renderOrdersTable=(...a)=>{const r=rot(...a);clearTimeout(tmo);tmo=setTimeout(()=>{try{window.filterVouchers?.();window.syncVoucherLookup();window.updateBeneficiaries?.();}catch(e){}},400);return r;};}
 document.getElementById('voucherType')?.addEventListener('change',e=>{const v=document.getElementById('voucherValue');if(!v)return;if(e.target.value==='shipping'){v.value=0;v.disabled=true;}else v.disabled=false;});
 window.updateBeneficiaries=()=>{const th=[...document.querySelectorAll('th')].find(x=>x.textContent.trim()==='قيمة الخصم');if(!th)return;const table=th.closest('table');if(!table)return;
   let box=document.getElementById('benefSummary');if(!box){box=document.createElement('div');box.id='benefSummary';box.className='rpt-grid';table.parentElement.insertBefore(box,table);}
-  const list=(allOrders||[]).filter(o=>opN(o.discount)>0&&o.status!=='ملغي'),uniq=new Set(list.map(o=>String(o.customer?.phone||o.customer?.name||'')));
-  const sum=list.reduce((t,o)=>t+opN(o.discount),0);
-  box.innerHTML=`<div><small>عدد المستفيدين</small><b>${uniq.size}</b></div><div><small>عدد الطلبات المخفّضة</small><b>${list.length}</b></div><div class="wide"><small>إجمالي الخصومات</small><b>${opM(sum)}</b></div>`;
+  const rows=[];(allVouchers||[]).forEach(v=>Object.values(v.usedBy||{}).forEach(u=>rows.push({code:v.code,key:String(u.phone||u.name||''),disc:opN(u.discountAmount)})));
+  const uniq=new Set(rows.map(r=>r.key)),sum=rows.reduce((t,r)=>t+r.disc,0),per={};rows.forEach(r=>{per[r.code]=(per[r.code]||0)+1;});
+  box.innerHTML=`<div><small>عدد المستفيدين</small><b>${uniq.size}</b></div><div><small>مرات استخدام الكوبونات</small><b>${rows.length}</b></div><div class="wide"><small>إجمالي الخصومات</small><b>${opM(sum)}</b></div><div class="wide"><small>الاستخدام لكل كوبون</small><b style="font-size:13px">${Object.keys(per).length?Object.entries(per).map(([k,v])=>__escH(k)+': '+v).join(' — '):'لا يوجد'}</b></div>`;
   const tb=table.querySelector('tbody');if(tb&&!tb.dataset.obs){tb.dataset.obs='1';new MutationObserver(()=>window.updateBeneficiaries()).observe(tb,{childList:true});}};
 setTimeout(()=>window.updateBeneficiaries?.(),1500);
